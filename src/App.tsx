@@ -1,0 +1,492 @@
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import {
+  TOOLS,
+  TOOL_MAP,
+  CATEGORY_LABELS,
+  CATEGORY_ORDER,
+  searchTools,
+  type ToolMeta,
+} from './registry'
+import { useTheme, type Theme } from './hooks/useTheme'
+import { useLocalStorage } from './hooks/useLocalStorage'
+import { useSettings } from './hooks/useSettings'
+import { SettingsPanel } from './components/SettingsPanel'
+import { detectContent } from './core/detect'
+import { isDesktop, onOpenFile, onGlobalActivate, onClipboardChanged } from './core/desktop'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+  faToolbox,
+  faBars,
+  faXmark,
+  faClipboard,
+  faStar as faStarSolid,
+  faGear,
+  faSun,
+  faMoon,
+  faDesktop,
+  faQuestion,
+} from '@fortawesome/free-solid-svg-icons'
+import { faStar as faStarRegular } from '@fortawesome/free-regular-svg-icons'
+
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme()
+  const order: Theme[] = ['light', 'dark', 'system']
+  const icon: Record<Theme, typeof faSun> = { light: faSun, dark: faMoon, system: faDesktop }
+  const label: Record<Theme, string> = { light: '明亮', dark: '暗黑', system: '跟随系统' }
+  const next = () => setTheme(order[(order.indexOf(theme) + 1) % order.length])
+  return (
+    <button
+      type="button"
+      onClick={next}
+      title={`主题：${label[theme]}（点击切换）`}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-md text-base transition-colors hover:bg-slate-200/70 dark:hover:bg-slate-700/60"
+    >
+      <FontAwesomeIcon icon={icon[theme]} />
+    </button>
+  )
+}
+
+function ToolIcon({ tool }: { tool: ToolMeta }) {
+  return (
+    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-100 text-[11px] font-semibold text-slate-500 dark:bg-slate-700/60 dark:text-slate-300">
+      {tool.icon}
+    </span>
+  )
+}
+
+export function App() {
+  const [currentId, setCurrentId] = useLocalStorage<string>('devtoolbox:current', 'json')
+  const [favorites, setFavorites] = useLocalStorage<string[]>('devtoolbox:favorites', [])
+  const [query, setQuery] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [suggestion, setSuggestion] = useState<{ toolId: string; label: string } | null>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const [settings] = useSettings()
+
+  const current = TOOL_MAP[currentId] ?? TOOLS[0]
+
+  // 供快捷键处理器读取最新工具 id，避免闭包捕获旧值
+  const currentIdRef = useRef(currentId)
+  currentIdRef.current = currentId
+
+  const results = useMemo(() => searchTools(query), [query])
+  const searching = query.trim() !== ''
+
+  const toggleFavorite = useCallback(
+    (id: string) => {
+      setFavorites((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+    },
+    [setFavorites],
+  )
+
+  // 页内 / 全局快捷键
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const typing =
+        !!target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+
+      // Ctrl/Cmd+K：聚焦搜索（任何位置可用）
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        searchRef.current?.focus()
+        searchRef.current?.select()
+        return
+      }
+      // Ctrl/Cmd+,：打开设置
+      if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+        e.preventDefault()
+        setSettingsOpen(true)
+        return
+      }
+      // Ctrl/Cmd+B：切换侧边栏
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        setSidebarOpen((v) => !v)
+        return
+      }
+      // Esc：清空搜索 / 关闭浮层
+      if (e.key === 'Escape') {
+        if (document.activeElement === searchRef.current) {
+          setQuery('')
+          searchRef.current?.blur()
+        } else {
+          setHelpOpen(false)
+          setSettingsOpen(false)
+        }
+        return
+      }
+
+      // 以下无修饰键快捷键仅在非输入态生效
+      if (typing || e.ctrlKey || e.metaKey || e.altKey) return
+      // ? 或 Shift+/：快捷键帮助
+      if (e.key === '?') {
+        e.preventDefault()
+        setHelpOpen((v) => !v)
+        return
+      }
+      // f：收藏 / 取消收藏当前工具
+      if (e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        toggleFavorite(currentIdRef.current)
+        return
+      }
+      // [ / ]：在工具列表中上/下切换
+      if (e.key === '[' || e.key === ']') {
+        e.preventDefault()
+        const idx = TOOLS.findIndex((t) => t.id === currentIdRef.current)
+        if (idx >= 0) {
+          const nextIdx = e.key === ']' ? (idx + 1) % TOOLS.length : (idx - 1 + TOOLS.length) % TOOLS.length
+          setCurrentId(TOOLS[nextIdx].id)
+        }
+        return
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [toggleFavorite, setCurrentId])
+
+  const selectTool = useCallback(
+    (id: string) => {
+      setCurrentId(id)
+      setQuery('')
+    },
+    [setCurrentId],
+  )
+
+  // 剪贴板智能识别：读取剪贴板并推荐匹配工具
+  const detectClipboard = useCallback(async () => {
+    if (!settings.clipboardDetect) {
+      setSuggestion({ toolId: '', label: '剪贴板识别已在设置中关闭' })
+      setTimeout(() => setSuggestion(null), 4000)
+      return
+    }
+    setSuggestion(null)
+    try {
+      const text = await navigator.clipboard.readText()
+      const hits = detectContent(text)
+      if (hits.length > 0 && TOOL_MAP[hits[0].toolId]) {
+        setSuggestion({ toolId: hits[0].toolId, label: hits[0].label })
+      } else {
+        setSuggestion({ toolId: '', label: '未能识别剪贴板内容' })
+      }
+    } catch {
+      setSuggestion({ toolId: '', label: '无法读取剪贴板（需授权）' })
+    }
+    setTimeout(() => setSuggestion(null), 6000)
+  }, [settings.clipboardDetect])
+
+  // 桌面端（Tauri）原生事件桥接：文件关联打开、全局快捷键唤起、系统剪贴板监听。
+  // Web 环境下 onXxx 均为 no-op，不产生副作用。
+  useEffect(() => {
+    // 文件关联：双击 .json/.txt 等打开 → 按内容识别并跳转到对应工具，回填输入
+    const offOpen = onOpenFile(({ content }) => {
+      const hits = detectContent(content)
+      const toolId = hits[0]?.toolId && TOOL_MAP[hits[0].toolId] ? hits[0].toolId : 'json'
+      setCurrentId(toolId)
+    })
+    // 全局快捷键唤起：聚焦搜索
+    const offActivate = onGlobalActivate(() => {
+      searchRef.current?.focus()
+      searchRef.current?.select()
+    })
+    // 系统剪贴板监听：仅在设置开启时推荐
+    const offClip = onClipboardChanged((text) => {
+      if (!settings.clipboardDetect) return
+      const hits = detectContent(text)
+      if (hits.length > 0 && TOOL_MAP[hits[0].toolId]) {
+        setSuggestion({ toolId: hits[0].toolId, label: hits[0].label })
+        setTimeout(() => setSuggestion(null), 6000)
+      }
+    })
+    return () => {
+      offOpen()
+      offActivate()
+      offClip()
+    }
+  }, [setCurrentId, settings.clipboardDetect])
+
+  const favTools = favorites.map((id) => TOOL_MAP[id]).filter(Boolean)
+  const ToolComponent = current.component
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100">
+      {/* 侧边栏 */}
+      <aside
+        className={`flex shrink-0 flex-col border-r border-slate-200 bg-white transition-all dark:border-slate-700 dark:bg-slate-800/40 ${
+          sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'
+        }`}
+      >
+        <div className="flex h-14 items-center gap-2 border-b border-slate-200 px-4 dark:border-slate-700">
+          <FontAwesomeIcon icon={faToolbox} className="text-lg text-sky-500" />
+          <span className="font-semibold">开发者工具箱</span>
+        </div>
+        <nav className="flex-1 overflow-y-auto px-2 py-3">
+          {searching ? (
+            <div className="space-y-0.5">
+              <p className="px-2 py-1 text-xs font-medium text-slate-400">
+                搜索结果（{results.length}）
+              </p>
+              {results.length === 0 && (
+                <p className="px-2 py-4 text-center text-sm text-slate-400">无匹配工具</p>
+              )}
+              {results.map((tool) => (
+                <NavItem
+                  key={tool.id}
+                  tool={tool}
+                  active={tool.id === currentId}
+                  favorite={favorites.includes(tool.id)}
+                  onSelect={() => selectTool(tool.id)}
+                  onToggleFav={() => toggleFavorite(tool.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <>
+              {favTools.length > 0 && (
+                <div className="mb-3">
+                  <p className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-slate-400">
+                    <FontAwesomeIcon icon={faStarSolid} className="text-amber-400" /> 收藏
+                  </p>
+                  <div className="space-y-0.5">
+                    {favTools.map((tool) => (
+                      <NavItem
+                        key={tool.id}
+                        tool={tool}
+                        active={tool.id === currentId}
+                        favorite
+                        onSelect={() => selectTool(tool.id)}
+                        onToggleFav={() => toggleFavorite(tool.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {CATEGORY_ORDER.map((cat) => {
+                const tools = TOOLS.filter((t) => t.category === cat)
+                if (tools.length === 0) return null
+                return (
+                  <div key={cat} className="mb-3">
+                    <p className="px-2 py-1 text-xs font-medium text-slate-400">
+                      {CATEGORY_LABELS[cat]}
+                    </p>
+                    <div className="space-y-0.5">
+                      {tools.map((tool) => (
+                        <NavItem
+                          key={tool.id}
+                          tool={tool}
+                          active={tool.id === currentId}
+                          favorite={favorites.includes(tool.id)}
+                          onSelect={() => selectTool(tool.id)}
+                          onToggleFav={() => toggleFavorite(tool.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </>
+          )}
+        </nav>
+        <div className="border-t border-slate-200 px-4 py-2 text-center text-xs text-slate-400 dark:border-slate-700">
+          离线优先 · 数据不出本机
+          <span className="ml-1 rounded bg-slate-100 px-1 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-700/60 dark:text-slate-300">
+            {isDesktop() ? '桌面版' : 'Web 版'}
+          </span>
+        </div>
+      </aside>
+
+      {/* 主区 */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-14 items-center gap-3 border-b border-slate-200 px-4 dark:border-slate-700">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen((v) => !v)}
+            title="切换侧边栏"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-base transition-colors hover:bg-slate-200/70 dark:hover:bg-slate-700/60"
+          >
+            <FontAwesomeIcon icon={faBars} />
+          </button>
+          <div className="relative flex-1 max-w-xl">
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="搜索工具… (Ctrl/Cmd + K)"
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/50"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <FontAwesomeIcon icon={faXmark} />
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={detectClipboard}
+            title="识别剪贴板内容并推荐工具"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-base transition-colors hover:bg-slate-200/70 dark:hover:bg-slate-700/60"
+          >
+            <FontAwesomeIcon icon={faClipboard} />
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleFavorite(current.id)}
+            title={favorites.includes(current.id) ? '取消收藏' : '收藏当前工具'}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-base transition-colors hover:bg-slate-200/70 dark:hover:bg-slate-700/60"
+          >
+            <FontAwesomeIcon icon={favorites.includes(current.id) ? faStarSolid : faStarRegular} className={favorites.includes(current.id) ? 'text-amber-400' : ''} />
+          </button>
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            title="快捷键帮助（?）"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-base transition-colors hover:bg-slate-200/70 dark:hover:bg-slate-700/60"
+          >
+            <FontAwesomeIcon icon={faQuestion} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            title="设置（Ctrl/Cmd + ,）"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-base transition-colors hover:bg-slate-200/70 dark:hover:bg-slate-700/60"
+          >
+            <FontAwesomeIcon icon={faGear} />
+          </button>
+        </header>
+        {suggestion && (
+          <div className="flex items-center gap-3 border-b border-sky-200 bg-sky-50 px-4 py-2 text-sm dark:border-sky-900/50 dark:bg-sky-900/20">
+            <span className="text-slate-600 dark:text-slate-300">
+              {suggestion.toolId ? (
+                <>剪贴板内容疑似 <span className="font-medium text-sky-600 dark:text-sky-400">{suggestion.label}</span></>
+              ) : (
+                suggestion.label
+              )}
+            </span>
+            {suggestion.toolId && (
+              <button
+                type="button"
+                onClick={() => { selectTool(suggestion.toolId); setSuggestion(null) }}
+                className="rounded-md bg-sky-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-sky-600"
+              >
+                打开 {TOOL_MAP[suggestion.toolId]?.name}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSuggestion(null)}
+              className="ml-auto text-slate-400 hover:text-slate-600"
+            >
+              <FontAwesomeIcon icon={faXmark} />
+            </button>
+          </div>
+        )}
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
+          <ToolComponent key={current.id} />
+        </main>
+      </div>
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+    </div>
+  )
+}
+
+const SHORTCUTS: Array<[string, string]> = [
+  ['Ctrl / ⌘ + K', '聚焦全局搜索'],
+  ['Ctrl / ⌘ + ,', '打开设置'],
+  ['Ctrl / ⌘ + B', '切换侧边栏'],
+  ['Ctrl / ⌘ + Enter', '手动模式下执行处理'],
+  ['[  /  ]', '切换上一个 / 下一个工具'],
+  ['f', '收藏 / 取消收藏当前工具'],
+  ['?', '显示 / 隐藏本快捷键面板'],
+  ['Esc', '清空搜索 / 关闭浮层'],
+]
+
+function ShortcutsHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="快捷键"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">键盘快捷键</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-200/70 dark:hover:bg-slate-700/60"
+          >
+            <FontAwesomeIcon icon={faXmark} />
+          </button>
+        </div>
+        <div className="space-y-1.5">
+          {SHORTCUTS.map(([key, desc]) => (
+            <div key={key} className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-slate-600 dark:text-slate-300">{desc}</span>
+              <kbd className="rounded border border-slate-300 bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-600 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
+                {key}
+              </kbd>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function NavItem({
+  tool,
+  active,
+  favorite,
+  onSelect,
+  onToggleFav,
+}: {
+  tool: ToolMeta
+  active: boolean
+  favorite: boolean
+  onSelect: () => void
+  onToggleFav: () => void
+}) {
+  return (
+    <div
+      className={`group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors ${
+        active
+          ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
+          : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/50'
+      }`}
+    >
+      <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+        <ToolIcon tool={tool} />
+        <span className="truncate">{tool.name}</span>
+      </button>
+      <button
+        type="button"
+        onClick={onToggleFav}
+        title={favorite ? '取消收藏' : '收藏'}
+        className={`shrink-0 text-sm transition-opacity ${
+          favorite ? 'text-amber-400' : 'text-slate-300 opacity-0 group-hover:opacity-100 dark:text-slate-500'
+        }`}
+      >
+        <FontAwesomeIcon icon={favorite ? faStarSolid : faStarRegular} />
+      </button>
+    </div>
+  )
+}

@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 自定义滚动条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.5);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.8);
+}
+
+/* 焦点可见性（无障碍） */
+:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas,
+    'Courier New', monospace;
+}
+
+/* ---------- Markdown 预览排版 ---------- */
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1em 0 0.5em;
+}
+.markdown-preview h1 { font-size: 1.6em; border-bottom: 1px solid rgba(148, 163, 184, 0.3); padding-bottom: 0.3em; }
+.markdown-preview h2 { font-size: 1.35em; border-bottom: 1px solid rgba(148, 163, 184, 0.2); padding-bottom: 0.25em; }
+.markdown-preview h3 { font-size: 1.15em; }
+.markdown-preview h4 { font-size: 1em; }
+.markdown-preview p { margin: 0.6em 0; line-height: 1.7; }
+.markdown-preview ul,
+.markdown-preview ol { margin: 0.6em 0; padding-left: 1.6em; }
+.markdown-preview ul { list-style: disc; }
+.markdown-preview ol { list-style: decimal; }
+.markdown-preview li { margin: 0.2em 0; }
+.markdown-preview li input[type='checkbox'] { margin-right: 0.4em; }
+.markdown-preview a { color: #0ea5e9; text-decoration: underline; }
+.markdown-preview blockquote {
+  margin: 0.6em 0;
+  padding: 0.2em 0.9em;
+  border-left: 3px solid rgba(148, 163, 184, 0.5);
+  color: rgba(100, 116, 139, 1);
+}
+.markdown-preview table { border-collapse: collapse; margin: 0.8em 0; display: block; overflow-x: auto; }
+.markdown-preview th,
+.markdown-preview td { border: 1px solid rgba(148, 163, 184, 0.35); padding: 0.4em 0.7em; }
+.markdown-preview th { background: rgba(148, 163, 184, 0.12); font-weight: 600; }
+.markdown-preview :not(pre) > code {
+  background: rgba(148, 163, 184, 0.18);
+  padding: 0.12em 0.35em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+}
+.markdown-preview hr { border: none; border-top: 1px solid rgba(148, 163, 184, 0.3); margin: 1em 0; }
+
+/* ---------- 代码块与语法高亮 ---------- */
+.markdown-preview pre.hl-pre,
+pre.hl-pre {
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  padding: 0.9em 1em;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+.dark .markdown-preview pre.hl-pre,
+.dark pre.hl-pre {
+  background: #0f172a;
+  border-color: rgba(71, 85, 105, 0.5);
+}
+.hl-pre code.hl-code {
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: 0.86em;
+  line-height: 1.6;
+  background: none;
+  padding: 0;
+  white-space: pre;
+}
+/* token 配色（明亮主题） */
+.hl-comment { color: #6b7280; font-style: italic; }
+.hl-string { color: #16a34a; }
+.hl-number { color: #d97706; }
+.hl-keyword { color: #7c3aed; font-weight: 600; }
+.hl-function { color: #2563eb; }
+.hl-property { color: #0891b2; }
+.hl-variable { color: #dc2626; }
+.hl-tag { color: #2563eb; }
+/* 暗色主题覆盖 */
+.dark .hl-comment { color: #94a3b8; }
+.dark .hl-string { color: #86efac; }
+.dark .hl-number { color: #fbbf24; }
+.dark .hl-keyword { color: #c4b5fd; }
+.dark .hl-function { color: #93c5fd; }
+.dark .hl-property { color: #67e8f9; }
+.dark .hl-variable { color: #fca5a5; }
+.dark .hl-tag { color: #93c5fd; }
