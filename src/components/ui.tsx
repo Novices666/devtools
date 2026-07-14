@@ -126,6 +126,93 @@ export function TextArea({ onFileText, mono = true, className = '', ...rest }: T
   )
 }
 
+// ---------- 文件选择与拖放 ----------
+interface FileDropInputProps {
+  accept?: string
+  onFile: (file: File) => void | Promise<void>
+  onReject?: (file: File) => void
+  children: ReactNode
+  className?: string
+  title?: string
+}
+
+function matchesAccept(file: File, accept?: string): boolean {
+  if (!accept) return true
+  const name = file.name.toLowerCase()
+  return accept.split(',').some((rawRule) => {
+    const rule = rawRule.trim().toLowerCase()
+    if (rule.startsWith('.')) return name.endsWith(rule)
+    if (rule.endsWith('/*')) {
+      if (file.type.toLowerCase().startsWith(rule.slice(0, -1))) return true
+      return rule === 'image/*' && /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(name)
+    }
+    return file.type.toLowerCase() === rule
+  })
+}
+
+/** 点击选择或拖放单个文件；只在拖入文件时接管浏览器默认行为。 */
+export function FileDropInput({
+  accept,
+  onFile,
+  onReject,
+  children,
+  className = '',
+  title,
+}: FileDropInputProps) {
+  const [dragging, setDragging] = useState(false)
+  const isFileDrag = (event: DragEvent<HTMLElement>) =>
+    Array.from(event.dataTransfer.types).includes('Files')
+  const handleFile = (file: File) => {
+    if (matchesAccept(file, accept)) void onFile(file)
+    else onReject?.(file)
+  }
+
+  return (
+    <label
+      title={title}
+      onDragEnter={(event) => {
+        if (!isFileDrag(event)) return
+        event.preventDefault()
+        setDragging(true)
+      }}
+      onDragOver={(event) => {
+        if (!isFileDrag(event)) return
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'copy'
+        setDragging(true)
+      }}
+      onDragLeave={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+        setDragging(false)
+      }}
+      onDrop={(event) => {
+        if (!isFileDrag(event)) return
+        event.preventDefault()
+        setDragging(false)
+        const file = event.dataTransfer.files[0]
+        if (file) handleFile(file)
+      }}
+      className={`${className} ${
+        dragging
+          ? 'border-sky-400 bg-sky-50 ring-2 ring-sky-400/30 dark:bg-sky-900/20'
+          : ''
+      }`}
+    >
+      {children}
+      <input
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0]
+          if (file) handleFile(file)
+          event.currentTarget.value = ''
+        }}
+      />
+    </label>
+  )
+}
+
 // ---------- 只读输出区 ----------
 export function Output({ value, mono = true, className = '' }: { value: string; mono?: boolean; className?: string }) {
   return (

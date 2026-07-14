@@ -12,6 +12,7 @@ import {
   Checkbox,
   Select,
   TextInput,
+  FileDropInput,
 } from '../components/ui'
 import { hashAll, hashArrayBuffer, hmac, HASH_ALGOS, type HashAlgo, type HmacOutput } from '../core/hash'
 import { aesEncrypt, aesDecrypt, generatePassword, generateToken, type AesMode, type AesPadding, type KeyFormat, type PasswordOptions } from '../core/crypto'
@@ -24,16 +25,29 @@ export function HashTool() {
   const [upper, setUpper] = useState(false)
   const [fileHash, setFileHash] = useState<Record<HashAlgo, string> | null>(null)
   const [fileName, setFileName] = useState('')
+  const [fileError, setFileError] = useState<string>()
 
   const hashes = useMemo(() => (input ? hashAll(input) : null), [input])
   const shown = fileHash ?? hashes
 
   async function onFile(file: File) {
-    const buf = await file.arrayBuffer()
-    const result = {} as Record<HashAlgo, string>
-    for (const algo of HASH_ALGOS) result[algo] = hashArrayBuffer(buf, algo)
-    setFileHash(result)
-    setFileName(file.name)
+    setFileError(undefined)
+    try {
+      const buf = await file.arrayBuffer()
+      const result = {} as Record<HashAlgo, string>
+      for (const algo of HASH_ALGOS) result[algo] = hashArrayBuffer(buf, algo)
+      setFileHash(result)
+      setFileName(file.name)
+    } catch (reason) {
+      setFileError(`文件读取失败: ${(reason as Error).message}`)
+    }
+  }
+
+  const useTextInput = (text: string) => {
+    setInput(text)
+    setFileHash(null)
+    setFileName('')
+    setFileError(undefined)
   }
 
   const fmt = (s: string) => (upper ? s.toUpperCase() : s)
@@ -42,13 +56,17 @@ export function HashTool() {
     <ToolShell title="哈希计算" description="MD5 / SHA1 / SHA256 / SHA384 / SHA512，支持文本与文件">
       <div className="flex flex-wrap items-center gap-2">
         <Checkbox checked={upper} onChange={setUpper} label="大写输出" />
-        <label className="cursor-pointer rounded-md bg-slate-200/70 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-300/70 dark:bg-slate-700/60 dark:text-slate-200 dark:hover:bg-slate-600/60">
+        <FileDropInput
+          onFile={onFile}
+          title="点击选择文件，或拖入文件按原始字节计算"
+          className="cursor-pointer rounded-md bg-slate-200/70 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-300/70 dark:bg-slate-700/60 dark:text-slate-200 dark:hover:bg-slate-600/60"
+        >
           选择文件
-          <input type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f) }} />
-        </label>
+        </FileDropInput>
         {fileName && <span className="text-xs text-slate-500">文件：{fileName}</span>}
-        <Button className="ml-auto" variant="danger" onClick={() => { setInput(''); setFileHash(null); setFileName('') }}>清空</Button>
+        <Button className="ml-auto" variant="danger" onClick={() => { setInput(''); setFileHash(null); setFileName(''); setFileError(undefined) }}>清空</Button>
       </div>
+      <ErrorHint message={fileError} />
       <Panel title="哈希结果" className="flex-none">
         <div className="space-y-2">
           {shown &&
@@ -62,7 +80,7 @@ export function HashTool() {
         </div>
       </Panel>
       <Panel title="输入文本" className="min-h-0 flex-1">
-        <TextArea value={input} onChange={(e) => { setInput(e.target.value); setFileHash(null); setFileName('') }} onFileText={(t) => setInput(t)} placeholder="输入文本进行哈希" className="min-h-[120px]" />
+        <TextArea value={input} onChange={(e) => useTextInput(e.target.value)} onFileText={(t) => useTextInput(t)} placeholder="输入文本进行哈希" className="min-h-[120px]" />
       </Panel>
     </ToolShell>
   )

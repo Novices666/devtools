@@ -6,6 +6,7 @@ import {
   Button,
   TextInput,
   ErrorHint,
+  FileDropInput,
 } from '../components/ui'
 import {
   convertRadix,
@@ -155,6 +156,7 @@ export function QrCodeTool() {
   const [svgUrl, setSvgUrl] = useState('')
   const [decoded, setDecoded] = useState<string>()
   const [error, setError] = useState<string>()
+  const [decodeError, setDecodeError] = useState<string>()
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -185,29 +187,38 @@ export function QrCodeTool() {
   }, [text])
 
   const onDecodeFile = (file: File) => {
+    setDecoded(undefined)
+    setDecodeError(undefined)
     const reader = new FileReader()
     reader.onload = () => {
       const img = new Image()
       img.onload = async () => {
-        const canvas = canvasRef.current
-        if (!canvas) return
-        canvas.width = img.width
-        canvas.height = img.height
-        const ctx = canvas.getContext('2d')!
-        ctx.drawImage(img, 0, 0)
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-        const jsQR = (await import('jsqr')).default
-        const result = jsQR(imgData.data, imgData.width, imgData.height)
-        if (result) {
-          setDecoded(result.data)
-          setError(undefined)
-        } else {
-          setDecoded(undefined)
-          setError('未能识别二维码')
+        try {
+          const canvas = canvasRef.current
+          if (!canvas) throw new Error('二维码画布不可用')
+          canvas.width = img.width
+          canvas.height = img.height
+          const ctx = canvas.getContext('2d')
+          if (!ctx) throw new Error('无法读取图片像素')
+          ctx.drawImage(img, 0, 0)
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+          const jsQR = (await import('jsqr')).default
+          const result = jsQR(imgData.data, imgData.width, imgData.height)
+          if (result) {
+            setDecoded(result.data)
+            setDecodeError(undefined)
+          } else {
+            setDecodeError('未能识别二维码')
+          }
+        } catch (reason) {
+          setDecodeError((reason as Error).message)
         }
       }
+      img.onerror = () => setDecodeError('图片解码失败')
       img.src = String(reader.result)
     }
+    reader.onerror = () => setDecodeError('图片读取失败')
+    reader.onabort = () => setDecodeError('图片读取已取消')
     reader.readAsDataURL(file)
   }
 
@@ -234,18 +245,18 @@ export function QrCodeTool() {
           </div>
         </Panel>
         <Panel title="解析">
-          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-300 p-8 text-sm text-slate-500 hover:border-sky-400 dark:border-slate-600">
-            <span>点击选择二维码图片</span>
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) onDecodeFile(f)
-              }}
-            />
-          </label>
+          <FileDropInput
+            accept="image/*"
+            onFile={onDecodeFile}
+            onReject={() => {
+              setDecoded(undefined)
+              setDecodeError('请选择图片文件')
+            }}
+            className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-300 p-8 text-sm text-slate-500 transition-colors hover:border-sky-400 dark:border-slate-600"
+          >
+            <span>点击或拖拽二维码图片</span>
+          </FileDropInput>
+          <ErrorHint message={decodeError} />
           <canvas ref={canvasRef} className="hidden" />
           {decoded && (
             <div className="mt-3">

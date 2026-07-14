@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { cleanup, render, act, fireEvent } from '@testing-library/react'
+import { cleanup, render, act, fireEvent, waitFor } from '@testing-library/react'
 import { TOOLS } from '../registry'
 import { SettingsPanel } from '../components/SettingsPanel'
+import { FileDropInput } from '../components/ui'
 import { setSettings } from '../hooks/useSettings'
 
 // 为不支持 jsdom 的浏览器 API 提供最小 mock，避免渲染阶段崩溃
@@ -27,6 +28,55 @@ function beforeAllMocks() {
 afterEach(() => cleanup())
 
 describe('工具组件冒烟测试', () => {
+  it('图片文件拖放组件只接管符合类型的文件', () => {
+    const onFile = vi.fn()
+    const onReject = vi.fn()
+    const { getByText } = render(
+      <FileDropInput accept="image/*" onFile={onFile} onReject={onReject}>
+        <span>拖放图片</span>
+      </FileDropInput>,
+    )
+    const zone = getByText('拖放图片').closest('label')!
+    const image = new File(['png'], 'sample.png', { type: 'image/png' })
+    const textFile = new File(['text'], 'sample.txt', { type: 'text/plain' })
+
+    expect(
+      fireEvent.dragOver(zone, {
+        dataTransfer: { types: ['text/plain'], files: [], dropEffect: 'none' },
+      }),
+    ).toBe(true)
+    fireEvent.drop(zone, {
+      dataTransfer: { types: ['Files'], files: [image], dropEffect: 'none' },
+    })
+    expect(onFile).toHaveBeenCalledWith(image)
+
+    fireEvent.drop(zone, {
+      dataTransfer: { types: ['Files'], files: [textFile], dropEffect: 'none' },
+    })
+    expect(onReject).toHaveBeenCalledWith(textFile)
+  })
+
+  it('哈希工具按拖放目标区分文件哈希与文本输入', async () => {
+    const HashTool = TOOLS.find((tool) => tool.id === 'hash')!.component
+    const { getByText, getByRole, queryByText } = render(<HashTool />)
+    const binaryFile = new File(['abc'], 'sample.bin', { type: 'application/octet-stream' })
+    Object.defineProperty(binaryFile, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(new TextEncoder().encode('abc').buffer),
+    })
+
+    fireEvent.drop(getByText('选择文件').closest('label')!, {
+      dataTransfer: { types: ['Files'], files: [binaryFile], dropEffect: 'none' },
+    })
+    await waitFor(() => expect(getByText('文件：sample.bin')).toBeTruthy())
+
+    const textFile = new File(['text input'], 'sample.txt', { type: 'text/plain' })
+    fireEvent.drop(getByRole('textbox'), {
+      dataTransfer: { types: ['Files'], files: [textFile], dropEffect: 'none' },
+    })
+    await waitFor(() => expect((getByRole('textbox') as HTMLTextAreaElement).value).toBe('text input'))
+    expect(queryByText('文件：sample.bin')).toBeNull()
+  })
+
   it.each(TOOLS.map((t) => [t.id, t.name, t.component] as const))(
     '渲染 %s (%s) 不应抛错',
     (_id, _name, Component) => {

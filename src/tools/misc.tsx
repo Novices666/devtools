@@ -12,6 +12,7 @@ import {
   Segmented,
   Checkbox,
   ErrorHint,
+  FileDropInput,
 } from '../components/ui'
 import { marked } from 'marked'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -144,18 +145,21 @@ export function ImageTool() {
       setError('请选择图片文件')
       return
     }
-    setSrcName(file.name)
+    setError(undefined)
     const reader = new FileReader()
     reader.onload = () => {
       const img = new Image()
       img.onload = () => {
         imgRef.current = img
+        setSrcName(file.name)
         setSrcInfo({ url: img.src, size: file.size, width: img.naturalWidth, height: img.naturalHeight })
         process(img)
       }
       img.onerror = () => setError('图片解码失败')
       img.src = String(reader.result)
     }
+    reader.onerror = () => setError('图片读取失败')
+    reader.onabort = () => setError('图片读取已取消')
     reader.readAsDataURL(file)
   }
 
@@ -206,16 +210,15 @@ export function ImageTool() {
       </div>
       <ErrorHint message={error} />
       {!srcInfo && (
-        <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-300 p-12 text-sm text-slate-500 hover:border-sky-400 dark:border-slate-600">
+        <FileDropInput
+          accept="image/*"
+          onFile={onFile}
+          onReject={() => setError('请选择图片文件')}
+          className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-300 p-12 text-sm text-slate-500 transition-colors hover:border-sky-400 dark:border-slate-600"
+        >
           <span className="text-3xl text-slate-400"><FontAwesomeIcon icon={faImage} /></span>
           <span>点击或拖拽选择图片</span>
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f) }}
-          />
-        </label>
+        </FileDropInput>
       )}
       {srcInfo && (
         <TwoPane
@@ -223,15 +226,26 @@ export function ImageTool() {
             <Panel
               title="原图"
               actions={
-                <label className="cursor-pointer text-xs text-sky-600 hover:underline dark:text-sky-400">
+                <FileDropInput
+                  accept="image/*"
+                  onFile={onFile}
+                  onReject={() => setError('请选择图片文件')}
+                  title="点击或拖入图片进行更换"
+                  className="cursor-pointer text-xs text-sky-600 hover:underline dark:text-sky-400"
+                >
                   更换
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f) }} />
-                </label>
+                </FileDropInput>
               }
             >
-              <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-md bg-slate-100 p-2 dark:bg-slate-900/50">
+              <FileDropInput
+                accept="image/*"
+                onFile={onFile}
+                onReject={() => setError('请选择图片文件')}
+                title="点击或拖入图片进行更换"
+                className="flex min-h-0 flex-1 cursor-pointer items-center justify-center overflow-auto rounded-md border border-transparent bg-slate-100 p-2 transition-colors dark:bg-slate-900/50"
+              >
                 <img src={srcInfo.url} alt="原图" className="max-h-full max-w-full object-contain" />
-              </div>
+              </FileDropInput>
               <div className="mt-2 text-xs text-slate-500">
                 {srcName} · {srcInfo.width}×{srcInfo.height} · {fmtSize(srcInfo.size)}
               </div>

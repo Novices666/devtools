@@ -12,12 +12,14 @@ import {
   ErrorHint,
   Checkbox,
   ProcessControls,
+  FileDropInput,
 } from '../components/ui'
 import { useProcessMode } from '../hooks/useProcessMode'
 import {
   textToBase,
   baseToText,
   bytesToBase64,
+  detectImageMime,
   base64ToImage,
   BASE_ENCODING_OPTIONS,
   CHARACTER_ENCODING_OPTIONS,
@@ -66,6 +68,7 @@ export function Base64Tool() {
   const [base, setBase] = useState<BaseEncoding>('base64')
   const [characterEncoding, setCharacterEncoding] = useState<CharacterEncoding>('utf-8')
   const [imgData, setImgData] = useState('')
+  const [imageError, setImageError] = useState<string>()
   const { committed, commit, manual, dirty } = useProcessMode(input)
   const { out, error } = useMemo(() => {
     if (committed === '') return { out: '' }
@@ -91,6 +94,19 @@ export function Base64Tool() {
     ? decodedImage.mime.split('/')[1].replace('svg+xml', 'svg').replace('jpeg', 'jpg')
     : 'png'
 
+  async function onImageFile(file: File) {
+    setImageError(undefined)
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      const mime = file.type || detectImageMime(bytes)
+      if (!mime?.startsWith('image/')) throw new Error('无法识别图片格式')
+      setImgData(`data:${mime};base64,${bytesToBase64(bytes)}`)
+    } catch (reason) {
+      setImgData('')
+      setImageError(`图片读取失败: ${(reason as Error).message}`)
+    }
+  }
+
   return (
     <ToolShell title="Base 编解码" description="常用 Base 制式互转，可指定文本字符编码">
       <div className="flex flex-wrap items-center gap-2">
@@ -109,6 +125,7 @@ export function Base64Tool() {
             onChange={(value) => {
               setBase(value)
               setImgData('')
+              setImageError(undefined)
             }}
             options={BASE_ENCODING_OPTIONS}
           />
@@ -123,30 +140,21 @@ export function Base64Tool() {
         </label>
         <ProcessControls manual={manual} dirty={dirty} onRun={commit} />
         {base === 'base64' && (
-          <label className="cursor-pointer rounded-md bg-slate-200/70 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-300/70 dark:bg-slate-700/60 dark:text-slate-200 dark:hover:bg-slate-600/60">
+          <FileDropInput
+            accept="image/*"
+            onFile={onImageFile}
+            onReject={() => setImageError('请选择图片文件')}
+            title="点击或拖入图片"
+            className="cursor-pointer rounded-md bg-slate-200/70 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-300/70 dark:bg-slate-700/60 dark:text-slate-200 dark:hover:bg-slate-600/60"
+          >
             图片转 Base64
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (!file) return
-                const reader = new FileReader()
-                reader.onload = () => {
-                  const buf = reader.result as ArrayBuffer
-                  const b64 = bytesToBase64(new Uint8Array(buf))
-                  setImgData(`data:${file.type};base64,${b64}`)
-                }
-                reader.readAsArrayBuffer(file)
-              }}
-            />
-          </label>
+          </FileDropInput>
         )}
-        <Button className="ml-auto" variant="danger" onClick={() => { setInput(''); setImgData('') }}>
+        <Button className="ml-auto" variant="danger" onClick={() => { setInput(''); setImgData(''); setImageError(undefined) }}>
           清空
         </Button>
       </div>
+      <ErrorHint message={imageError} />
       {imgData ? (
         <TwoPane
           left={
