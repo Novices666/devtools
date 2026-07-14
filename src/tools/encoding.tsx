@@ -25,6 +25,7 @@ import {
   urlDecode,
   parseQueryString,
   buildQueryString,
+  queryParamsToJson,
   escapeHtml,
   unescapeHtml,
   toUnicodeEscape,
@@ -213,6 +214,10 @@ export function UrlTool() {
     setParams(parseQueryString(input))
   }
   const rebuilt = useMemo(() => buildQueryString(params), [params])
+  const paramsJson = useMemo(
+    () => (params.some((param) => param.key !== '') ? queryParamsToJson(params) : ''),
+    [params],
+  )
 
   return (
     <ToolShell title="URL 编解码" description="URL 编码 / 解码、query string 参数解析与重组">
@@ -246,7 +251,16 @@ export function UrlTool() {
           <Panel title="URL / Query String 输入" className="flex-none">
             <TextArea value={input} onChange={(e) => setInput(e.target.value)} placeholder="粘贴 URL 或 query string，如 a=1&b=hello%20world" className="min-h-[80px]" />
           </Panel>
-          <Panel title="参数表格（可编辑）" actions={<CopyButton text={rebuilt} label="复制重组结果" />} className="flex-1">
+          <Panel
+            title="参数表格（可编辑）"
+            actions={
+              <>
+                <CopyButton text={paramsJson} label="复制为 JSON" />
+                <CopyButton text={rebuilt} label="复制重组结果" />
+              </>
+            }
+            className="flex-1"
+          >
             <div className="min-h-0 flex-1 overflow-auto">
               <table className="w-full text-sm">
                 <thead>

@@ -23,6 +23,7 @@ import {
   urlDecode,
   parseQueryString,
   buildQueryString,
+  queryParamsToJson,
   escapeHtml,
   unescapeHtml,
   toUnicodeEscape,
@@ -193,6 +194,18 @@ describe('encoding', () => {
       { key: 'b', value: 'hello world' },
     ])
     expect(buildQueryString(params)).toBe('a=1&b=hello%20world')
+  })
+  it('converts query params to JSON and preserves duplicate keys', () => {
+    const params = [
+      { key: 'tag', value: 'one' },
+      { key: 'name', value: 'devtoolbox' },
+      { key: 'tag', value: 'two' },
+      { key: '', value: 'ignored' },
+    ]
+    expect(JSON.parse(queryParamsToJson(params))).toEqual({
+      tag: ['one', 'two'],
+      name: 'devtoolbox',
+    })
   })
   it('html entities', () => {
     expect(escapeHtml('<a href="x">&')).toBe('&lt;a href=&quot;x&quot;&gt;&amp;')

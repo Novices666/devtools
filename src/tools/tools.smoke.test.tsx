@@ -69,6 +69,28 @@ describe('工具组件冒烟测试', () => {
     expect(getByText('image/gif')).toBeTruthy()
     expect(queryByText(/Base64 包含非法字符/)).toBeNull()
   })
+
+  it('URL 参数解析结果可复制为 JSON', async () => {
+    const UrlTool = TOOLS.find((t) => t.id === 'url')!.component
+    const { getByRole } = render(<UrlTool />)
+    const writeText = vi.mocked(navigator.clipboard.writeText)
+    writeText.mockClear()
+
+    fireEvent.click(getByRole('button', { name: '参数解析' }))
+    const copyJson = getByRole('button', { name: '复制为 JSON' }) as HTMLButtonElement
+    expect(copyJson.disabled).toBe(true)
+
+    fireEvent.change(getByRole('textbox'), {
+      target: { value: 'https://example.com/?tag=one&name=devtoolbox&tag=two' },
+    })
+    fireEvent.click(getByRole('button', { name: '解析' }))
+    expect(copyJson.disabled).toBe(false)
+
+    await act(async () => fireEvent.click(copyJson))
+    expect(writeText).toHaveBeenCalledWith(
+      '{\n  "tag": [\n    "one",\n    "two"\n  ],\n  "name": "devtoolbox"\n}',
+    )
+  })
 })
 
 describe('设置面板', () => {

@@ -519,6 +519,23 @@ export function buildQueryString(params: QueryParam[]): string {
     .join('&')
 }
 
+/** 将参数列表格式化为 JSON；重复键合并为数组，空键与重组查询串一致地忽略。 */
+export function queryParamsToJson(params: QueryParam[]): string {
+  const values = new Map<string, string | string[]>()
+  for (const param of params) {
+    if (param.key === '') continue
+    const current = values.get(param.key)
+    if (current === undefined) {
+      values.set(param.key, param.value)
+    } else if (Array.isArray(current)) {
+      current.push(param.value)
+    } else {
+      values.set(param.key, [current, param.value])
+    }
+  }
+  return JSON.stringify(Object.fromEntries(values), null, 2)
+}
+
 // ---------- HTML 实体 ----------
 
 const HTML_ESCAPE_MAP: Record<string, string> = {
