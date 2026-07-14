@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import { cleanup, render, act, fireEvent, waitFor } from '@testing-library/react'
 import { TOOLS } from '../registry'
 import { SettingsPanel } from '../components/SettingsPanel'
-import { FileDropInput } from '../components/ui'
+import { FileDropInput, TextArea } from '../components/ui'
 import { setSettings } from '../hooks/useSettings'
 
 // 为不支持 jsdom 的浏览器 API 提供最小 mock，避免渲染阶段崩溃
@@ -56,6 +56,29 @@ describe('工具组件冒烟测试', () => {
     expect(onReject).toHaveBeenCalledWith(textFile)
   })
 
+  it('文本文件拖放不拦截普通文本并显示解码错误', async () => {
+    const onFileText = vi.fn()
+    const { getByRole, getByText } = render(<TextArea onFileText={onFileText} />)
+    const textArea = getByRole('textbox')
+
+    expect(
+      fireEvent.dragOver(textArea, {
+        dataTransfer: { types: ['text/plain'], files: [], dropEffect: 'none' },
+      }),
+    ).toBe(true)
+
+    const invalidFile = new File(['invalid'], 'invalid.txt', { type: 'text/plain' })
+    Object.defineProperty(invalidFile, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(Uint8Array.from([0x81]).buffer),
+    })
+    fireEvent.drop(textArea, {
+      dataTransfer: { types: ['Files'], files: [invalidFile], dropEffect: 'none' },
+    })
+
+    await waitFor(() => expect(getByText(/文件编码无法识别/)).toBeTruthy())
+    expect(onFileText).not.toHaveBeenCalled()
+  })
+
   it('哈希工具按拖放目标区分文件哈希与文本输入', async () => {
     const HashTool = TOOLS.find((tool) => tool.id === 'hash')!.component
     const { getByText, getByRole, queryByText } = render(<HashTool />)
@@ -70,6 +93,9 @@ describe('工具组件冒烟测试', () => {
     await waitFor(() => expect(getByText('文件：sample.bin')).toBeTruthy())
 
     const textFile = new File(['text input'], 'sample.txt', { type: 'text/plain' })
+    Object.defineProperty(textFile, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(new TextEncoder().encode('text input').buffer),
+    })
     fireEvent.drop(getByRole('textbox'), {
       dataTransfer: { types: ['Files'], files: [textFile], dropEffect: 'none' },
     })

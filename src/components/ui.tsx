@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlay } from '@fortawesome/free-solid-svg-icons'
+import { readTextFile } from '../core/files'
 
 // ---------- 复制按钮 ----------
 export function CopyButton({ text, label = '复制', className = '' }: { text: string; label?: string; className?: string }) {
@@ -92,37 +93,56 @@ interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   onFileText?: (text: string, file: File) => void
   mono?: boolean
 }
-export function TextArea({ onFileText, mono = true, className = '', ...rest }: TextAreaProps) {
+export function TextArea({ onFileText, mono = true, className = '', onChange, ...rest }: TextAreaProps) {
   const [dragging, setDragging] = useState(false)
+  const [fileError, setFileError] = useState<string>()
+  const isFileDrag = (event: DragEvent<HTMLTextAreaElement>) =>
+    Array.from(event.dataTransfer.types).includes('Files')
   const onDrop = useCallback(
-    (e: DragEvent<HTMLTextAreaElement>) => {
+    async (e: DragEvent<HTMLTextAreaElement>) => {
+      if (!Array.from(e.dataTransfer.types).includes('Files')) return
       e.preventDefault()
       setDragging(false)
       const file = e.dataTransfer.files[0]
       if (file && onFileText) {
-        const reader = new FileReader()
-        reader.onload = () => onFileText(String(reader.result ?? ''), file)
-        reader.readAsText(file)
+        setFileError(undefined)
+        try {
+          onFileText(await readTextFile(file), file)
+        } catch (reason) {
+          setFileError((reason as Error).message)
+        }
       }
     },
     [onFileText],
   )
   return (
-    <textarea
-      spellCheck={false}
-      onDragOver={(e) => {
-        if (onFileText) {
-          e.preventDefault()
-          setDragging(true)
-        }
-      }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={onFileText ? onDrop : undefined}
-      className={`min-h-0 flex-1 resize-none rounded-md border bg-slate-50 p-3 text-sm outline-none transition-colors focus:border-sky-400 dark:bg-slate-900/50 dark:text-slate-100 ${
-        mono ? 'font-mono' : ''
-      } ${dragging ? 'border-sky-400 ring-2 ring-sky-400/30' : 'border-slate-200 dark:border-slate-700'} ${className}`}
-      {...rest}
-    />
+    <>
+      <textarea
+        {...rest}
+        spellCheck={false}
+        onChange={(event) => {
+          setFileError(undefined)
+          onChange?.(event)
+        }}
+        onDragOver={(e) => {
+          if (onFileText && isFileDrag(e)) {
+            e.dataTransfer.dropEffect = 'copy'
+            e.preventDefault()
+            setDragging(true)
+          }
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onFileText ? onDrop : undefined}
+        className={`min-h-0 flex-1 resize-none rounded-md border bg-slate-50 p-3 text-sm outline-none transition-colors focus:border-sky-400 dark:bg-slate-900/50 dark:text-slate-100 ${
+          mono ? 'font-mono' : ''
+        } ${dragging ? 'border-sky-400 ring-2 ring-sky-400/30' : 'border-slate-200 dark:border-slate-700'} ${className}`}
+      />
+      {fileError && (
+        <div className="mt-2 rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+          {fileError}
+        </div>
+      )}
+    </>
   )
 }
 
