@@ -79,6 +79,19 @@ describe('工具组件冒烟测试', () => {
     expect(onFileText).not.toHaveBeenCalled()
   })
 
+  it('Diff 工具将超限计算显示为错误提示', () => {
+    const DiffTool = TOOLS.find((tool) => tool.id === 'diff')!.component
+    const { getAllByRole, getByText } = render(<DiffTool />)
+    const textareas = getAllByRole('textbox') as HTMLTextAreaElement[]
+    const largeText = 'a'.repeat(1500)
+
+    fireEvent.click(getByText('字符级'))
+    fireEvent.change(textareas[0], { target: { value: largeText } })
+    fireEvent.change(textareas[1], { target: { value: largeText } })
+
+    expect(getByText(/字符级 Diff 计算量超过限制/)).toBeTruthy()
+  })
+
   it('哈希工具按拖放目标区分文件哈希与文本输入', async () => {
     const HashTool = TOOLS.find((tool) => tool.id === 'hash')!.component
     const { getByText, getByRole, queryByText } = render(<HashTool />)

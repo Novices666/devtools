@@ -48,6 +48,7 @@ import {
   diffLines,
   diffStats,
   diffChars,
+  MAX_DIFF_MATRIX_CELLS,
   diffJson,
   jsonDiffStats,
   toTitleCase,
@@ -513,6 +514,16 @@ describe('text', () => {
   it('diff chars handles unicode', () => {
     const segs = diffChars('你好', '你们好')
     expect(segs.find((s) => s.op === 'insert')?.text).toBe('们')
+  })
+  it('diff lines rejects an oversized LCS matrix', () => {
+    const lineCount = Math.floor(Math.sqrt(MAX_DIFF_MATRIX_CELLS)) + 1
+    const text = Array.from({ length: lineCount }, (_, i) => String(i)).join('\n')
+    expect(() => diffLines(text, text)).toThrow('行级 Diff 计算量超过限制')
+  })
+  it('diff chars rejects an oversized LCS matrix', () => {
+    const charCount = Math.floor(Math.sqrt(MAX_DIFF_MATRIX_CELLS)) + 1
+    const text = 'a'.repeat(charCount)
+    expect(() => diffChars(text, text)).toThrow('字符级 Diff 计算量超过限制')
   })
   it('json structural diff', () => {
     const entries = diffJson('{"a":1,"b":2,"c":3}', '{"a":1,"b":9,"d":4}')

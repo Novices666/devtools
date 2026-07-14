@@ -193,12 +193,21 @@ export interface DiffLine {
   rightNo?: number
 }
 
+export const MAX_DIFF_MATRIX_CELLS = 2_000_000
+
+function assertDiffMatrixSize(rows: number, columns: number, mode: string): void {
+  if (rows > Math.floor(MAX_DIFF_MATRIX_CELLS / columns)) {
+    throw new Error(`文本过大，${mode} Diff 计算量超过限制，请减少两侧内容后重试`)
+  }
+}
+
 /** 基于 LCS 的行级 diff */
 export function diffLines(a: string, b: string): DiffLine[] {
   const aLines = a.split(/\r\n|\r|\n/)
   const bLines = b.split(/\r\n|\r|\n/)
   const n = aLines.length
   const m = bLines.length
+  assertDiffMatrixSize(n + 1, m + 1, '行级')
   // LCS DP 表
   const dp: number[][] = Array.from({ length: n + 1 }, () =>
     new Array<number>(m + 1).fill(0),
@@ -264,6 +273,7 @@ export function diffChars(a: string, b: string): DiffSegment[] {
   const bChars = [...b]
   const n = aChars.length
   const m = bChars.length
+  assertDiffMatrixSize(n + 1, m + 1, '字符级')
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0))
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {

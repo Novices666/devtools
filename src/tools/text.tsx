@@ -38,9 +38,23 @@ export function DiffTool() {
   const [right, setRight] = useState('')
   const [mode, setMode] = useState<DiffMode>('line')
 
-  const lineDiff = useMemo(() => (mode === 'line' ? diffLines(left, right) : []), [left, right, mode])
-  const lineStats = useMemo(() => diffStats(lineDiff), [lineDiff])
-  const charDiff = useMemo(() => (mode === 'char' ? diffChars(left, right) : []), [left, right, mode])
+  const lineResult = useMemo(() => {
+    if (mode !== 'line') return { diff: [], error: undefined as string | undefined }
+    try {
+      return { diff: diffLines(left, right), error: undefined as string | undefined }
+    } catch (e) {
+      return { diff: [], error: (e as Error).message }
+    }
+  }, [left, right, mode])
+  const lineStats = useMemo(() => diffStats(lineResult.diff), [lineResult.diff])
+  const charResult = useMemo(() => {
+    if (mode !== 'char') return { diff: [], error: undefined as string | undefined }
+    try {
+      return { diff: diffChars(left, right), error: undefined as string | undefined }
+    } catch (e) {
+      return { diff: [], error: (e as Error).message }
+    }
+  }, [left, right, mode])
   const jsonResult = useMemo(() => {
     if (mode !== 'json' || (!left.trim() && !right.trim())) return null
     try {
@@ -63,7 +77,7 @@ export function DiffTool() {
             { label: 'JSON 结构化', value: 'json' },
           ]}
         />
-        {mode === 'line' && (
+        {mode === 'line' && !lineResult.error && (
           <>
             <span className="text-green-600 dark:text-green-400">+ 新增 {lineStats.added}</span>
             <span className="text-red-600 dark:text-red-400">- 删除 {lineStats.removed}</span>
@@ -94,14 +108,22 @@ export function DiffTool() {
           </Panel>
         }
       />
-      <ErrorHint message={mode === 'json' ? jsonResult?.error : undefined} />
+      <ErrorHint
+        message={
+          mode === 'line'
+            ? lineResult.error
+            : mode === 'char'
+              ? charResult.error
+              : jsonResult?.error
+        }
+      />
       <Panel title="差异结果" className="max-h-[40vh]">
         <div className="min-h-0 flex-1 overflow-auto rounded-md border border-slate-200 bg-slate-50 font-mono text-xs dark:border-slate-700 dark:bg-slate-900/50">
           {mode === 'line' && (
-            lineDiff.length === 0 || (!left && !right) ? (
+            lineResult.diff.length === 0 || (!left && !right) ? (
               <div className="p-3 text-slate-400">暂无内容</div>
             ) : (
-              lineDiff.map((line, i) => (
+              lineResult.diff.map((line, i) => (
                 <div
                   key={i}
                   className={`flex whitespace-pre-wrap px-2 py-0.5 ${
@@ -125,7 +147,7 @@ export function DiffTool() {
               <div className="p-3 text-slate-400">暂无内容</div>
             ) : (
               <div className="whitespace-pre-wrap p-3 leading-relaxed">
-                {charDiff.map((seg, i) =>
+                {charResult.diff.map((seg, i) =>
                   seg.op === 'equal' ? (
                     <span key={i} className="text-slate-600 dark:text-slate-300">{seg.text}</span>
                   ) : seg.op === 'insert' ? (
