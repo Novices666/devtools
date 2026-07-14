@@ -115,10 +115,10 @@ export const TOOLS: ToolMeta[] = [
   // ---------- 编码解码 ----------
   {
     id: 'base64',
-    name: 'Base64',
+    name: 'Base 编解码',
     category: 'encoding',
-    keywords: ['base64', '编码', '解码', 'encode', 'decode', '图片', 'image', 'datauri'],
-    icon: '64',
+    keywords: ['base16', 'base32', 'base36', 'base58', 'base62', 'base64', 'base85', 'ascii85', '编码', '解码', '字符集', 'utf8', 'utf16', 'utf32', 'ascii', 'encode', 'decode', '图片', 'image', 'datauri'],
+    icon: 'B#',
     component: Base64Tool,
     priority: 'P0',
   },

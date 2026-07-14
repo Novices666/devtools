@@ -12,6 +12,11 @@ import {
   textToBase64,
   base64ToText,
   base64ToBytes,
+  textToBase,
+  baseToText,
+  encodeBase,
+  decodeBase,
+  type BaseEncoding,
   detectImageMime,
   base64ToImage,
   urlEncode,
@@ -129,6 +134,53 @@ describe('encoding', () => {
     expect(b).not.toContain('+')
     expect(b).not.toContain('/')
     expect(base64ToText(b)).toBe('>>>???')
+  })
+  it('supports common Base encodings with known vectors', () => {
+    expect(textToBase('foo', 'base16')).toBe('666F6F')
+    expect(textToBase('foo', 'base32')).toBe('MZXW6===')
+    expect(textToBase('foo', 'base58')).toBe('bQbp')
+    expect(textToBase('foo', 'base64')).toBe('Zm9v')
+    expect(textToBase('foo', 'base64url')).toBe('Zm9v')
+    expect(textToBase('foo', 'ascii85')).toBe('AoDS')
+  })
+  it('roundtrips every Base encoding and preserves leading zero bytes', () => {
+    const bases: BaseEncoding[] = ['base16', 'base32', 'base36', 'base58', 'base62', 'base64', 'base64url', 'ascii85']
+    const bytes = new Uint8Array([0, 0, 1, 2, 3, 250, 255])
+    for (const base of bases) {
+      expect(decodeBase(encodeBase(bytes, base), base)).toEqual(bytes)
+    }
+  })
+  it('encodes whitespace-only text instead of treating it as empty', () => {
+    expect(textToBase(' ', 'base16')).toBe('20')
+    expect(baseToText('20', 'base16')).toBe(' ')
+  })
+  it('bounds quadratic radix conversions to short data', () => {
+    expect(() => encodeBase(new Uint8Array(4097), 'base58')).toThrow('4096 字节')
+    expect(() => decodeBase('z'.repeat(6000), 'base58')).toThrow('短数据')
+    expect(() => encodeBase(new Uint8Array(4097), 'base64')).not.toThrow()
+  })
+  it('supports selectable character encodings', () => {
+    expect(textToBase('你好', 'base16', 'utf-8')).toBe('E4BDA0E5A5BD')
+    expect(textToBase('你好', 'base16', 'utf-16le')).toBe('604F7D59')
+    expect(textToBase('你好', 'base16', 'utf-16be')).toBe('4F60597D')
+    expect(textToBase('你好', 'base16', 'utf-32le')).toBe('604F00007D590000')
+    expect(textToBase('你好', 'base16', 'utf-32be')).toBe('00004F600000597D')
+    expect(baseToText('604F00007D590000', 'base16', 'utf-32le')).toBe('你好')
+    expect(baseToText('00004F600000597D', 'base16', 'utf-32be')).toBe('你好')
+    expect(baseToText(textToBase('café', 'ascii85', 'iso-8859-1'), 'ascii85', 'iso-8859-1')).toBe('café')
+    expect(baseToText(textToBase('plain text', 'base62', 'ascii'), 'base62', 'ascii')).toBe('plain text')
+    expect(() => textToBase('中文', 'base64', 'ascii')).toThrow('无法表示')
+    expect(() => textToBase('中文', 'base64', 'iso-8859-1')).toThrow('无法表示')
+  })
+  it('rejects malformed Base input', () => {
+    expect(() => decodeBase('ABC', 'base16')).toThrow('偶数')
+    expect(() => decodeBase('MZXW6=!=', 'base32')).toThrow('非法')
+    expect(() => decodeBase('A', 'base32')).toThrow('长度')
+    expect(() => decodeBase('MZXW6==', 'base32')).toThrow('填充')
+    expect(() => decodeBase('0OIl', 'base58')).toThrow('非法')
+    expect(() => decodeBase('A', 'base64')).toThrow('长度')
+    expect(() => decodeBase('Zm9v=', 'base64')).toThrow('填充')
+    expect(() => decodeBase('~', 'ascii85')).toThrow('非法')
   })
   it('url encode/decode', () => {
     expect(urlEncode('a b&c')).toBe('a%20b%26c')

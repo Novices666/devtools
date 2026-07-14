@@ -8,16 +8,19 @@ import {
   CopyButton,
   Button,
   Segmented,
+  Select,
   ErrorHint,
   Checkbox,
   ProcessControls,
 } from '../components/ui'
 import { useProcessMode } from '../hooks/useProcessMode'
 import {
-  textToBase64,
-  base64ToText,
+  textToBase,
+  baseToText,
   bytesToBase64,
   base64ToImage,
+  BASE_ENCODING_OPTIONS,
+  CHARACTER_ENCODING_OPTIONS,
   urlEncode,
   urlDecode,
   parseQueryString,
@@ -28,6 +31,8 @@ import {
   fromUnicodeEscape,
   escapeString,
   unescapeString,
+  type BaseEncoding,
+  type CharacterEncoding,
   type QueryParam,
 } from '../core/encoding'
 import {
@@ -51,30 +56,40 @@ function runSafe(fn: () => string): { out: string; error?: string } {
   }
 }
 
-// ---------- Base64 ----------
+// ---------- Base 编解码 ----------
 export function Base64Tool() {
   const [input, setInput] = useState('')
   const [mode, setMode] = useState<'encode' | 'decode'>('encode')
-  const [urlSafe, setUrlSafe] = useState(false)
+  const [base, setBase] = useState<BaseEncoding>('base64')
+  const [characterEncoding, setCharacterEncoding] = useState<CharacterEncoding>('utf-8')
   const [imgData, setImgData] = useState('')
   const { committed, commit, manual, dirty } = useProcessMode(input)
   const { out, error } = useMemo(() => {
-    if (!committed.trim()) return { out: '' }
-    return runSafe(() => (mode === 'encode' ? textToBase64(committed, urlSafe) : base64ToText(committed)))
-  }, [committed, mode, urlSafe])
+    if (committed === '') return { out: '' }
+    return runSafe(() =>
+      mode === 'encode'
+        ? textToBase(committed, base, characterEncoding)
+        : baseToText(committed, base, characterEncoding),
+    )
+  }, [committed, mode, base, characterEncoding])
+
+  const baseLabel = BASE_ENCODING_OPTIONS.find((option) => option.value === base)?.label ?? base
+  const characterLabel =
+    CHARACTER_ENCODING_OPTIONS.find((option) => option.value === characterEncoding)?.label ?? characterEncoding
+  const supportsImageDecode = base === 'base64' || base === 'base64url'
 
   // 解码方向：识别输入是否为图片，提供预览 + 下载
   const decodedImage = useMemo(() => {
-    if (mode !== 'decode' || !committed.trim()) return null
+    if (mode !== 'decode' || !supportsImageDecode || !committed.trim()) return null
     const r = base64ToImage(committed)
     return r.isImage ? r : null
-  }, [committed, mode])
+  }, [committed, mode, supportsImageDecode])
   const imgExt = decodedImage?.mime
     ? decodedImage.mime.split('/')[1].replace('svg+xml', 'svg').replace('jpeg', 'jpg')
     : 'png'
 
   return (
-    <ToolShell title="Base64 编解码" description="文本 / 图片 Base64 互转，支持 URL-safe 变体">
+    <ToolShell title="Base 编解码" description="常用 Base 制式互转，可指定文本字符编码">
       <div className="flex flex-wrap items-center gap-2">
         <Segmented
           value={mode}
@@ -84,51 +99,77 @@ export function Base64Tool() {
             { label: '解码', value: 'decode' },
           ]}
         />
-        {mode === 'encode' && <Checkbox checked={urlSafe} onChange={setUrlSafe} label="URL-safe" />}
-        <ProcessControls manual={manual} dirty={dirty} onRun={commit} />
-        <label className="cursor-pointer rounded-md bg-slate-200/70 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-300/70 dark:bg-slate-700/60 dark:text-slate-200 dark:hover:bg-slate-600/60">
-          图片转 Base64
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (!file) return
-              const reader = new FileReader()
-              reader.onload = () => {
-                const buf = reader.result as ArrayBuffer
-                const b64 = bytesToBase64(new Uint8Array(buf))
-                setImgData(`data:${file.type};base64,${b64}`)
-              }
-              reader.readAsArrayBuffer(file)
+        <label className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+          Base 制式
+          <Select
+            value={base}
+            onChange={(value) => {
+              setBase(value)
+              setImgData('')
             }}
+            options={BASE_ENCODING_OPTIONS}
           />
         </label>
+        <label className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+          字符编码
+          <Select
+            value={characterEncoding}
+            onChange={setCharacterEncoding}
+            options={CHARACTER_ENCODING_OPTIONS}
+          />
+        </label>
+        <ProcessControls manual={manual} dirty={dirty} onRun={commit} />
+        {base === 'base64' && (
+          <label className="cursor-pointer rounded-md bg-slate-200/70 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-300/70 dark:bg-slate-700/60 dark:text-slate-200 dark:hover:bg-slate-600/60">
+            图片转 Base64
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                const reader = new FileReader()
+                reader.onload = () => {
+                  const buf = reader.result as ArrayBuffer
+                  const b64 = bytesToBase64(new Uint8Array(buf))
+                  setImgData(`data:${file.type};base64,${b64}`)
+                }
+                reader.readAsArrayBuffer(file)
+              }}
+            />
+          </label>
+        )}
         <Button className="ml-auto" variant="danger" onClick={() => { setInput(''); setImgData('') }}>
           清空
         </Button>
       </div>
       {imgData ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <Panel title="图片 Data URI" actions={<CopyButton text={imgData} />} className="flex-1">
-            <Output value={imgData} />
-          </Panel>
-          <div className="flex items-center justify-center rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800/50">
-            <img src={imgData} alt="预览" className="max-h-48 rounded" />
-          </div>
-        </div>
+        <TwoPane
+          left={
+            <Panel title="图片 Data URI" actions={<CopyButton text={imgData} />}>
+              <Output value={imgData} />
+            </Panel>
+          }
+          right={
+            <Panel title="图片预览">
+              <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-md bg-slate-100 p-3 dark:bg-slate-900/50">
+                <img src={imgData} alt="预览" className="max-h-full max-w-full object-contain" />
+              </div>
+            </Panel>
+          }
+        />
       ) : (
         <TwoPane
           left={
-            <Panel title="输入">
-              <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder={mode === 'encode' ? '输入文本' : '输入 Base64'} />
-              <ErrorHint message={error} />
+            <Panel title={mode === 'encode' ? `文本输入 (${characterLabel})` : `${baseLabel} 输入`}>
+              <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder={mode === 'encode' ? '输入待编码文本' : `输入 ${baseLabel}`} />
+              <ErrorHint message={decodedImage ? undefined : error} />
             </Panel>
           }
           right={
             <Panel
-              title={decodedImage ? '图片预览' : '输出'}
+              title={decodedImage ? '图片预览' : mode === 'encode' ? `${baseLabel} 输出` : `文本输出 (${characterLabel})`}
               actions={
                 decodedImage ? (
                   <a href={decodedImage.dataUri} download={`decoded.${imgExt}`}>

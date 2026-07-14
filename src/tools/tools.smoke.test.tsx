@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { cleanup, render, act } from '@testing-library/react'
+import { cleanup, render, act, fireEvent } from '@testing-library/react'
 import { TOOLS } from '../registry'
 import { SettingsPanel } from '../components/SettingsPanel'
 import { setSettings } from '../hooks/useSettings'
@@ -39,6 +39,35 @@ describe('工具组件冒烟测试', () => {
     expect(TOOLS.length).toBeGreaterThanOrEqual(29)
     const ids = new Set(TOOLS.map((t) => t.id))
     expect(ids.size).toBe(TOOLS.length) // id 无重复
+  })
+
+  it('Base 工具可切换制式与字符编码', () => {
+    const BaseTool = TOOLS.find((t) => t.id === 'base64')!.component
+    const { getAllByRole } = render(<BaseTool />)
+    const selects = getAllByRole('combobox') as HTMLSelectElement[]
+    const textareas = getAllByRole('textbox') as HTMLTextAreaElement[]
+
+    fireEvent.change(selects[0], { target: { value: 'base32' } })
+    fireEvent.change(selects[1], { target: { value: 'utf-16le' } })
+    fireEvent.change(textareas[0], { target: { value: '你好' } })
+
+    expect(selects[0].value).toBe('base32')
+    expect(selects[1].value).toBe('utf-16le')
+    expect(textareas[1].value).toBe('MBHX2WI=')
+  })
+
+  it('Base64 图片 Data URI 不显示文本解码错误', () => {
+    const BaseTool = TOOLS.find((t) => t.id === 'base64')!.component
+    const { getByRole, getAllByRole, getByText, queryByText } = render(<BaseTool />)
+
+    fireEvent.click(getByRole('button', { name: '解码' }))
+    fireEvent.change(getAllByRole('textbox')[0], {
+      target: { value: 'data:image/gif;base64,R0lGODlh' },
+    })
+
+    expect(getByText('图片预览')).toBeTruthy()
+    expect(getByText('image/gif')).toBeTruthy()
+    expect(queryByText(/Base64 包含非法字符/)).toBeNull()
   })
 })
 
