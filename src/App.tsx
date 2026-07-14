@@ -12,7 +12,7 @@ import { useLocalStorage } from './hooks/useLocalStorage'
 import { useSettings } from './hooks/useSettings'
 import { SettingsPanel } from './components/SettingsPanel'
 import { detectContent } from './core/detect'
-import { isDesktop, onOpenFile, onGlobalActivate, onClipboardChanged } from './core/desktop'
+import { isDesktop, onOpenFile, onClipboardChanged } from './core/desktop'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faToolbox,
@@ -24,7 +24,6 @@ import {
   faSun,
   faMoon,
   faDesktop,
-  faQuestion,
 } from '@fortawesome/free-solid-svg-icons'
 import { faStar as faStarRegular } from '@fortawesome/free-regular-svg-icons'
 
@@ -60,16 +59,11 @@ export function App() {
   const [query, setQuery] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [helpOpen, setHelpOpen] = useState(false)
   const [suggestion, setSuggestion] = useState<{ toolId: string; label: string } | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const [settings] = useSettings()
 
   const current = TOOL_MAP[currentId] ?? TOOLS[0]
-
-  // 供快捷键处理器读取最新工具 id，避免闭包捕获旧值
-  const currentIdRef = useRef(currentId)
-  currentIdRef.current = currentId
 
   const results = useMemo(() => searchTools(query), [query])
   const searching = query.trim() !== ''
@@ -80,77 +74,6 @@ export function App() {
     },
     [setFavorites],
   )
-
-  // 页内 / 全局快捷键
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null
-      const typing =
-        !!target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.tagName === 'SELECT' ||
-          target.isContentEditable)
-
-      // Ctrl/Cmd+K：聚焦搜索（任何位置可用）
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        searchRef.current?.focus()
-        searchRef.current?.select()
-        return
-      }
-      // Ctrl/Cmd+,：打开设置
-      if ((e.ctrlKey || e.metaKey) && e.key === ',') {
-        e.preventDefault()
-        setSettingsOpen(true)
-        return
-      }
-      // Ctrl/Cmd+B：切换侧边栏
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
-        e.preventDefault()
-        setSidebarOpen((v) => !v)
-        return
-      }
-      // Esc：清空搜索 / 关闭浮层
-      if (e.key === 'Escape') {
-        if (document.activeElement === searchRef.current) {
-          setQuery('')
-          searchRef.current?.blur()
-        } else {
-          setHelpOpen(false)
-          setSettingsOpen(false)
-        }
-        return
-      }
-
-      // 以下无修饰键快捷键仅在非输入态生效
-      if (typing || e.ctrlKey || e.metaKey || e.altKey) return
-      // ? 或 Shift+/：快捷键帮助
-      if (e.key === '?') {
-        e.preventDefault()
-        setHelpOpen((v) => !v)
-        return
-      }
-      // f：收藏 / 取消收藏当前工具
-      if (e.key.toLowerCase() === 'f') {
-        e.preventDefault()
-        toggleFavorite(currentIdRef.current)
-        return
-      }
-      // [ / ]：在工具列表中上/下切换
-      if (e.key === '[' || e.key === ']') {
-        e.preventDefault()
-        const idx = TOOLS.findIndex((t) => t.id === currentIdRef.current)
-        if (idx >= 0) {
-          const nextIdx = e.key === ']' ? (idx + 1) % TOOLS.length : (idx - 1 + TOOLS.length) % TOOLS.length
-          setCurrentId(TOOLS[nextIdx].id)
-        }
-        return
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [toggleFavorite, setCurrentId])
 
   const selectTool = useCallback(
     (id: string) => {
@@ -182,7 +105,7 @@ export function App() {
     setTimeout(() => setSuggestion(null), 6000)
   }, [settings.clipboardDetect])
 
-  // 桌面端（Tauri）原生事件桥接：文件关联打开、全局快捷键唤起、系统剪贴板监听。
+  // 桌面端（Tauri）原生事件桥接：文件关联打开、系统剪贴板监听。
   // Web 环境下 onXxx 均为 no-op，不产生副作用。
   useEffect(() => {
     // 文件关联：双击 .json/.txt 等打开 → 按内容识别并跳转到对应工具，回填输入
@@ -190,11 +113,6 @@ export function App() {
       const hits = detectContent(content)
       const toolId = hits[0]?.toolId && TOOL_MAP[hits[0].toolId] ? hits[0].toolId : 'json'
       setCurrentId(toolId)
-    })
-    // 全局快捷键唤起：聚焦搜索
-    const offActivate = onGlobalActivate(() => {
-      searchRef.current?.focus()
-      searchRef.current?.select()
     })
     // 系统剪贴板监听：仅在设置开启时推荐
     const offClip = onClipboardChanged((text) => {
@@ -207,7 +125,6 @@ export function App() {
     })
     return () => {
       offOpen()
-      offActivate()
       offClip()
     }
   }, [setCurrentId, settings.clipboardDetect])
@@ -318,7 +235,7 @@ export function App() {
               ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索工具… (Ctrl/Cmd + K)"
+              placeholder="搜索工具…"
               className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/50"
             />
             {query && (
@@ -350,16 +267,8 @@ export function App() {
           <ThemeToggle />
           <button
             type="button"
-            onClick={() => setHelpOpen(true)}
-            title="快捷键帮助（?）"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-base transition-colors hover:bg-slate-200/70 dark:hover:bg-slate-700/60"
-          >
-            <FontAwesomeIcon icon={faQuestion} />
-          </button>
-          <button
-            type="button"
             onClick={() => setSettingsOpen(true)}
-            title="设置（Ctrl/Cmd + ,）"
+            title="设置"
             className="inline-flex h-9 w-9 items-center justify-center rounded-md text-base transition-colors hover:bg-slate-200/70 dark:hover:bg-slate-700/60"
           >
             <FontAwesomeIcon icon={faGear} />
@@ -397,57 +306,6 @@ export function App() {
         </main>
       </div>
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
-    </div>
-  )
-}
-
-const SHORTCUTS: Array<[string, string]> = [
-  ['Ctrl / ⌘ + K', '聚焦全局搜索'],
-  ['Ctrl / ⌘ + ,', '打开设置'],
-  ['Ctrl / ⌘ + B', '切换侧边栏'],
-  ['Ctrl / ⌘ + Enter', '手动模式下执行处理'],
-  ['[  /  ]', '切换上一个 / 下一个工具'],
-  ['f', '收藏 / 取消收藏当前工具'],
-  ['?', '显示 / 隐藏本快捷键面板'],
-  ['Esc', '清空搜索 / 关闭浮层'],
-]
-
-function ShortcutsHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
-  if (!open) return null
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="快捷键"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-800"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">键盘快捷键</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-200/70 dark:hover:bg-slate-700/60"
-          >
-            <FontAwesomeIcon icon={faXmark} />
-          </button>
-        </div>
-        <div className="space-y-1.5">
-          {SHORTCUTS.map(([key, desc]) => (
-            <div key={key} className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-slate-600 dark:text-slate-300">{desc}</span>
-              <kbd className="rounded border border-slate-300 bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-600 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
-                {key}
-              </kbd>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   )
 }

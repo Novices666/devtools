@@ -54,7 +54,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             />
           </Row>
 
-          <Row label="处理模式" hint="自动：输入即处理；手动：Ctrl/Cmd+Enter 或点击执行">
+          <Row label="处理模式" hint="自动：输入即处理；手动：点击执行">
             <Segmented
               value={settings.processMode}
               onChange={(v) => update({ processMode: v })}

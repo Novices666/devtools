@@ -242,7 +242,7 @@ export function ProcessControls({ manual, dirty, onRun }: { manual: boolean; dir
           ? 'bg-sky-500 text-white hover:bg-sky-600'
           : 'bg-slate-200/70 text-slate-500 dark:bg-slate-700/60 dark:text-slate-300'
       }`}
-      title="手动模式：处理当前输入 (Ctrl/Cmd + Enter)"
+      title="手动模式：处理当前输入"
     >
       <FontAwesomeIcon icon={faPlay} className="text-[0.7em]" /> 执行{dirty ? ' •' : ''}
     </button>

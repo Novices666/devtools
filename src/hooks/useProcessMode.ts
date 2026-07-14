@@ -5,7 +5,7 @@ import { useSettings } from './useSettings'
  * 处理模式辅助 hook。
  *
  * 自动模式（默认）：committed 始终跟随 live，输入即处理。
- * 手动模式：committed 仅在调用 commit()（或 Ctrl/Cmd+Enter）时更新，
+ * 手动模式：committed 仅在调用 commit()（点击"执行"）时更新，
  *          期间 dirty=true 表示存在未处理的改动。
  *
  * 工具将 committed 传入既有的 useMemo 计算即可，改动量极小。
@@ -34,19 +34,6 @@ export function useProcessMode(live: string): {
     if (manual && !prevManual.current) setManualCommitted(liveRef.current)
     prevManual.current = manual
   }, [manual])
-
-  // 手动模式下 Ctrl/Cmd+Enter 触发处理
-  useEffect(() => {
-    if (!manual) return
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault()
-        commit()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [manual, commit])
 
   const dirty = manual && committed !== live
 

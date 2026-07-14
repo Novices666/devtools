@@ -4,7 +4,7 @@
 // - 纯 Web 环境下所有导出均为安全 no-op，绝不因缺少 Tauri 运行时而报错。
 // - 通过 `window.__TAURI_INTERNALS__` 探测运行时，避免静态 import @tauri-apps/*
 //   造成 Web 构建强依赖（保持一套前端双端运行）。
-// - 桌面专属能力（文件关联打开、全局快捷键唤起、托盘）由 Rust 侧发事件，
+// - 桌面专属能力（文件关联打开、系统剪贴板监听、托盘）由 Rust 侧发事件，
 //   前端在此订阅并转成回调。
 
 /** 是否运行在 Tauri 桌面容器内 */
@@ -41,23 +41,6 @@ export function onOpenFile(handler: (payload: { path: string; content: string })
   let dispose: (() => void) | null = null
   api
     .listen('open-file', (e) => handler(e.payload as { path: string; content: string }))
-    .then((d) => {
-      dispose = d
-    })
-    .catch(() => {})
-  return () => dispose?.()
-}
-
-/**
- * 订阅全局快捷键唤起主窗口 / 聚焦搜索事件。
- * Rust 侧注册全局快捷键（默认 CmdOrCtrl+Shift+Space）后以 `global-activate` 发送。
- */
-export function onGlobalActivate(handler: () => void): () => void {
-  const api = eventApi()
-  if (!api) return () => {}
-  let dispose: (() => void) | null = null
-  api
-    .listen('global-activate', () => handler())
     .then((d) => {
       dispose = d
     })

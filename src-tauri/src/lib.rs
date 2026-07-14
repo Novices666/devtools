@@ -4,9 +4,8 @@ use tauri::{
     Emitter, Manager,
 };
 use tauri_plugin_clipboard_manager::ClipboardExt;
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
-/// 显示并聚焦主窗口（供托盘、全局快捷键、文件关联复用）
+/// 显示并聚焦主窗口（供托盘、文件关联复用）
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
         let _ = win.show();
@@ -81,27 +80,8 @@ pub fn run() {
             show_main_window(app);
             forward_opened_files(app, &argv);
         }))
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, shortcut, event| {
-                    // 全局唤起：Ctrl+Shift+Space
-                    let toggle: Shortcut =
-                        Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Space);
-                    if shortcut == &toggle && event.state() == ShortcutState::Pressed {
-                        show_main_window(app);
-                        // 通知前端聚焦搜索框（与 desktop.ts 的 onGlobalActivate 契约一致）
-                        let _ = app.emit("global-activate", ());
-                    }
-                })
-                .build(),
-        )
         .setup(|app| {
             let handle = app.handle();
-
-            // 注册全局快捷键
-            let toggle =
-                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Space);
-            app.global_shortcut().register(toggle)?;
 
             // 系统托盘 + 右键菜单
             let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
