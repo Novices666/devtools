@@ -503,11 +503,64 @@ export function parseQueryString(input: string): QueryParam[] {
   })
 }
 
+/**
+ * 严格解析完整 URL 或 Query String。
+ * 用于参数互转场景，避免把任意普通文本误判为无值参数。
+ */
+export function parseQueryStringStrict(input: string): QueryParam[] {
+  const trimmed = input.trim()
+  if (trimmed === '') throw new Error('请输入 URL 或 Query String')
+
+  const isAbsoluteUrl = /^[a-z][a-z\d+.-]*:\/\//i.test(trimmed)
+  const hasQueryPrefix = trimmed.startsWith('?')
+  let query: string
+
+  if (isAbsoluteUrl) {
+    let url: URL
+    try {
+      url = new URL(trimmed)
+    } catch {
+      throw new Error('URL 格式无效')
+    }
+    query = url.search.slice(1)
+    if (query === '') throw new Error('URL 中未包含查询参数')
+  } else {
+    if (trimmed.includes('?') && !hasQueryPrefix) throw new Error('请输入完整 URL 或 Query String')
+    query = hasQueryPrefix ? trimmed.slice(1) : trimmed
+    const hashIndex = query.indexOf('#')
+    if (hashIndex >= 0) query = query.slice(0, hashIndex)
+    if (query === '') throw new Error('Query String 不能为空')
+    if (!hasQueryPrefix && !query.includes('=') && !query.includes('&')) {
+      throw new Error('Query String 应包含 key=value 参数')
+    }
+  }
+
+  const pairs = query.split('&').filter((pair) => pair !== '')
+  if (pairs.length === 0) throw new Error('Query String 未包含有效参数')
+
+  return pairs.map((pair) => {
+    const equalsIndex = pair.indexOf('=')
+    const rawKey = equalsIndex < 0 ? pair : pair.slice(0, equalsIndex)
+    const rawValue = equalsIndex < 0 ? '' : pair.slice(equalsIndex + 1)
+    const key = decodeQueryComponentStrict(rawKey)
+    if (key === '') throw new Error('Query String 包含空参数键')
+    return { key, value: decodeQueryComponentStrict(rawValue) }
+  })
+}
+
 function safeDecode(s: string): string {
   try {
     return decodeURIComponent(s.replace(/\+/g, ' '))
   } catch {
     return s
+  }
+}
+
+function decodeQueryComponentStrict(value: string): string {
+  try {
+    return decodeURIComponent(value.replace(/\+/g, ' '))
+  } catch {
+    throw new Error(`Query String 包含无效的 URL 编码: ${value}`)
   }
 }
 
@@ -534,6 +587,31 @@ export function queryParamsToJson(params: QueryParam[]): string {
     }
   }
   return JSON.stringify(Object.fromEntries(values), null, 2)
+}
+
+/** 将 JSON 对象转换为参数列表；数组展开为重复键，嵌套对象不做隐式序列化。 */
+export function jsonToQueryParams(input: string): QueryParam[] {
+  let value: unknown
+  try {
+    value = JSON.parse(input)
+  } catch (error) {
+    throw new Error(`JSON 解析失败: ${(error as Error).message}`)
+  }
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('JSON 顶层必须是对象')
+  }
+
+  const params: QueryParam[] = []
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    const values = Array.isArray(raw) ? raw : [raw]
+    for (const item of values) {
+      if (item !== null && typeof item === 'object') {
+        throw new Error(`参数 "${key}" 不能包含嵌套对象或数组`)
+      }
+      params.push({ key, value: item === null ? '' : String(item) })
+    }
+  }
+  return params
 }
 
 // ---------- HTML 实体 ----------

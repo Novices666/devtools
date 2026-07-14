@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react'
 import { JsonTool } from './tools/json'
 import { YamlTool, CsvTool, XmlTool, TomlTool, SqlTool, JsonTypesTool } from './tools/formats'
-import { Base64Tool, UrlTool, HtmlEntityTool, UnicodeTool, JwtTool } from './tools/encoding'
+import { Base64Tool, UrlTool, UrlJsonTool, HtmlEntityTool, UnicodeTool, JwtTool } from './tools/encoding'
 import { HashTool, HmacTool, AesTool, BcryptTool, PasswordTool, RsaTool } from './tools/crypto'
 import { TimestampTool, CronTool, IdTool, SnowflakeTool } from './tools/time'
 import { DiffTool, RegexTool, TextTransformTool } from './tools/text'
@@ -130,6 +130,15 @@ export const TOOLS: ToolMeta[] = [
     icon: '://',
     component: UrlTool,
     priority: 'P0',
+  },
+  {
+    id: 'url-json',
+    name: 'URL 参数 ↔ JSON',
+    category: 'encoding',
+    keywords: ['url', 'query', 'querystring', 'json', '参数', '互转', '转换', '键值对'],
+    icon: '?J',
+    component: UrlJsonTool,
+    priority: 'P1',
   },
   {
     id: 'html-entity',

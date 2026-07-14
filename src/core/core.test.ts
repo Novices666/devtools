@@ -22,8 +22,10 @@ import {
   urlEncode,
   urlDecode,
   parseQueryString,
+  parseQueryStringStrict,
   buildQueryString,
   queryParamsToJson,
+  jsonToQueryParams,
   escapeHtml,
   unescapeHtml,
   toUnicodeEscape,
@@ -195,6 +197,38 @@ describe('encoding', () => {
     ])
     expect(buildQueryString(params)).toBe('a=1&b=hello%20world')
   })
+  it('strictly parses URLs and query strings', () => {
+    expect(parseQueryStringStrict('https://x.com/path?a=1&tag=one&tag=two#section')).toEqual([
+      { key: 'a', value: '1' },
+      { key: 'tag', value: 'one' },
+      { key: 'tag', value: 'two' },
+    ])
+    expect(parseQueryStringStrict('?flag&name=hello+world')).toEqual([
+      { key: 'flag', value: '' },
+      { key: 'name', value: 'hello world' },
+    ])
+    expect(parseQueryStringStrict('a=1&b=2')).toEqual([
+      { key: 'a', value: '1' },
+      { key: 'b', value: '2' },
+    ])
+    expect(
+      parseQueryStringStrict(
+        'https://cn.bing.com/search?&q=github%E6%8F%90%E4%BA%A4%E8%A7%84%E8%8C%83',
+      ),
+    ).toEqual([{ key: 'q', value: 'github提交规范' }])
+    expect(parseQueryStringStrict('?&a=1&&b=2&')).toEqual([
+      { key: 'a', value: '1' },
+      { key: 'b', value: '2' },
+    ])
+  })
+  it('rejects text and malformed query strings in strict mode', () => {
+    expect(() => parseQueryStringStrict('ordinary text')).toThrow('key=value')
+    expect(() => parseQueryStringStrict('https://example.com/path')).toThrow('未包含查询参数')
+    expect(() => parseQueryStringStrict('/path?a=1')).toThrow('完整 URL')
+    expect(() => parseQueryStringStrict('=value')).toThrow('空参数键')
+    expect(() => parseQueryStringStrict('a=%ZZ')).toThrow('无效的 URL 编码')
+    expect(() => parseQueryStringStrict('?&&')).toThrow('未包含有效参数')
+  })
   it('converts query params to JSON and preserves duplicate keys', () => {
     const params = [
       { key: 'tag', value: 'one' },
@@ -206,6 +240,22 @@ describe('encoding', () => {
       tag: ['one', 'two'],
       name: 'devtoolbox',
     })
+  })
+  it('converts a JSON object to query params', () => {
+    const params = jsonToQueryParams('{"tag":["one","two"],"page":2,"active":true,"empty":null}')
+    expect(params).toEqual([
+      { key: 'tag', value: 'one' },
+      { key: 'tag', value: 'two' },
+      { key: 'page', value: '2' },
+      { key: 'active', value: 'true' },
+      { key: 'empty', value: '' },
+    ])
+    expect(buildQueryString(params)).toBe('tag=one&tag=two&page=2&active=true&empty=')
+  })
+  it('rejects ambiguous JSON parameter structures', () => {
+    expect(() => jsonToQueryParams('[]')).toThrow('顶层必须是对象')
+    expect(() => jsonToQueryParams('{"filter":{"name":"x"}}')).toThrow('嵌套对象')
+    expect(() => jsonToQueryParams('{bad json}')).toThrow('JSON 解析失败')
   })
   it('html entities', () => {
     expect(escapeHtml('<a href="x">&')).toBe('&lt;a href=&quot;x&quot;&gt;&amp;')

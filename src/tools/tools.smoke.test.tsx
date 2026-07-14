@@ -91,6 +91,31 @@ describe('工具组件冒烟测试', () => {
       '{\n  "tag": [\n    "one",\n    "two"\n  ],\n  "name": "devtoolbox"\n}',
     )
   })
+
+  it('独立 URL 参数与 JSON 工具支持双向转换', () => {
+    const UrlJsonTool = TOOLS.find((t) => t.id === 'url-json')!.component
+    const { getByRole, getAllByRole } = render(<UrlJsonTool />)
+    const textareas = getAllByRole('textbox') as HTMLTextAreaElement[]
+
+    fireEvent.change(textareas[0], { target: { value: '?tag=one&tag=two&page=2' } })
+    expect(JSON.parse(textareas[1].value)).toEqual({ tag: ['one', 'two'], page: '2' })
+
+    fireEvent.click(getByRole('button', { name: 'JSON → URL 参数' }))
+    fireEvent.change(textareas[0], {
+      target: { value: '{"tag":["one","two"],"page":2}' },
+    })
+    expect(textareas[1].value).toBe('tag=one&tag=two&page=2')
+  })
+
+  it('URL 参数与 JSON 工具拒绝普通文本输入', () => {
+    const UrlJsonTool = TOOLS.find((t) => t.id === 'url-json')!.component
+    const { getAllByRole, getByText } = render(<UrlJsonTool />)
+
+    fireEvent.change(getAllByRole('textbox')[0], { target: { value: 'ordinary text' } })
+
+    expect((getAllByRole('textbox')[1] as HTMLTextAreaElement).value).toBe('')
+    expect(getByText(/Query String 应包含 key=value 参数/)).toBeTruthy()
+  })
 })
 
 describe('设置面板', () => {

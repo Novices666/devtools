@@ -24,8 +24,10 @@ import {
   urlEncode,
   urlDecode,
   parseQueryString,
+  parseQueryStringStrict,
   buildQueryString,
   queryParamsToJson,
+  jsonToQueryParams,
   escapeHtml,
   unescapeHtml,
   toUnicodeEscape,
@@ -306,6 +308,70 @@ export function UrlTool() {
           }
         />
       )}
+    </ToolShell>
+  )
+}
+
+// ---------- URL 参数 ↔ JSON ----------
+export function UrlJsonTool() {
+  const [input, setInput] = useState('')
+  const [direction, setDirection] = useState<'queryToJson' | 'jsonToQuery'>('queryToJson')
+  const { committed, commit, manual, dirty } = useProcessMode(input)
+  const { out, error } = useMemo(() => {
+    if (committed.trim() === '') return { out: '' }
+    return runSafe(() =>
+      direction === 'queryToJson'
+        ? queryParamsToJson(parseQueryStringStrict(committed))
+        : buildQueryString(jsonToQueryParams(committed)),
+    )
+  }, [committed, direction])
+
+  const queryToJson = direction === 'queryToJson'
+
+  return (
+    <ToolShell title="URL 参数 ↔ JSON" description="URL 查询参数与 JSON 对象双向转换">
+      <div className="flex flex-wrap items-center gap-2">
+        <Segmented
+          value={direction}
+          onChange={setDirection}
+          options={[
+            { label: 'URL 参数 → JSON', value: 'queryToJson' },
+            { label: 'JSON → URL 参数', value: 'jsonToQuery' },
+          ]}
+        />
+        <ProcessControls manual={manual} dirty={dirty} onRun={commit} />
+        <Button className="ml-auto" variant="danger" onClick={() => setInput('')}>
+          清空
+        </Button>
+      </div>
+      <TwoPane
+        left={
+          <Panel
+            title={queryToJson ? 'URL / Query String 输入' : 'JSON 输入'}
+            actions={<HistoryMenu toolId="url-json" value={input} onRestore={setInput} />}
+          >
+            <TextArea
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onFileText={(text) => setInput(text)}
+              placeholder={
+                queryToJson
+                  ? '输入完整 URL 或参数，如 ?page=1&tag=js&tag=ts'
+                  : '输入 JSON 对象，如 {"page":1,"tag":["js","ts"]}'
+              }
+            />
+            <ErrorHint message={error} />
+          </Panel>
+        }
+        right={
+          <Panel
+            title={queryToJson ? 'JSON 输出' : 'URL 参数输出'}
+            actions={<CopyButton text={out} />}
+          >
+            <Output value={out} />
+          </Panel>
+        }
+      />
     </ToolShell>
   )
 }
