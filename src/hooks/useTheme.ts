@@ -12,6 +12,7 @@ export function useTheme() {
     const apply = () => {
       const dark = theme === 'dark' || (theme === 'system' && media.matches)
       root.classList.toggle('dark', dark)
+      root.style.colorScheme = dark ? 'dark' : 'light'
     }
     apply()
     if (theme === 'system') {

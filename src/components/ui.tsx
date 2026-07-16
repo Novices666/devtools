@@ -2,8 +2,10 @@ import {
   useState,
   useCallback,
   type ReactNode,
+  type CSSProperties,
   type TextareaHTMLAttributes,
   type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
   type ChangeEvent,
   type DragEvent,
 } from 'react'
@@ -313,10 +315,40 @@ export function Checkbox({ checked, onChange, label }: { checked: boolean; onCha
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 rounded border-slate-300 text-sky-500 focus:ring-sky-400 dark:border-slate-600"
+        className="checkbox-control h-4 w-4"
       />
       {label}
     </label>
+  )
+}
+
+// ---------- 滑块 ----------
+type RangeProps = Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  'type' | 'min' | 'max' | 'value'
+> & {
+  min: number
+  max: number
+  value: number
+}
+
+export function Range({ min, max, value, className = '', style, ...rest }: RangeProps) {
+  const progress = max === min ? 0 : ((value - min) / (max - min)) * 100
+  const rangeStyle = {
+    ...style,
+    '--range-progress': `${Math.max(0, Math.min(100, progress))}%`,
+  } as CSSProperties
+
+  return (
+    <input
+      {...rest}
+      type="range"
+      min={min}
+      max={max}
+      value={value}
+      style={rangeStyle}
+      className={`range-control ${className}`}
+    />
   )
 }
 

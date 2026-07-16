@@ -13,6 +13,7 @@ import {
   Checkbox,
   ErrorHint,
   FileDropInput,
+  Range,
 } from '../components/ui'
 import { marked } from 'marked'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -211,8 +212,7 @@ export function ImageTool() {
         {format !== 'image/png' && (
           <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             质量 {quality}
-            <input
-              type="range"
+            <Range
               min={1}
               max={100}
               value={quality}

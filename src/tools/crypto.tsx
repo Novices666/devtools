@@ -13,6 +13,7 @@ import {
   Select,
   TextInput,
   FileDropInput,
+  Range,
 } from '../components/ui'
 import { hashAll, hashArrayBuffer, hmac, HASH_ALGOS, type HashAlgo, type HmacOutput } from '../core/hash'
 import { aesEncrypt, aesDecrypt, generatePassword, generateToken, type AesMode, type AesPadding, type KeyFormat, type PasswordOptions } from '../core/crypto'
@@ -205,7 +206,7 @@ export function BcryptTool() {
               <TextInput value={plain} onChange={setPlain} placeholder="明文密码" className="w-full" />
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-500">强度 (rounds)</span>
-                <input type="range" min={4} max={14} value={rounds} onChange={(e) => setRounds(Number(e.target.value))} className="flex-1" />
+                <Range min={4} max={14} value={rounds} onChange={(e) => setRounds(Number(e.target.value))} className="flex-1" />
                 <span className="w-8 text-sm">{rounds}</span>
               </div>
               <Button variant="primary" onClick={doHash} disabled={busy}>{busy ? '计算中…' : '生成'}</Button>
@@ -270,7 +271,7 @@ export function PasswordTool() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-500">长度</span>
-                <input type="range" min={4} max={64} value={opts.length} onChange={(e) => setOpts({ ...opts, length: Number(e.target.value) })} className="flex-1" />
+                <Range min={4} max={64} value={opts.length} onChange={(e) => setOpts({ ...opts, length: Number(e.target.value) })} className="flex-1" />
                 <span className="w-8 text-sm">{opts.length}</span>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-2">
@@ -291,7 +292,7 @@ export function PasswordTool() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-500">字节数</span>
-                <input type="range" min={8} max={64} value={tokenBytes} onChange={(e) => setTokenBytes(Number(e.target.value))} className="flex-1" />
+                <Range min={8} max={64} value={tokenBytes} onChange={(e) => setTokenBytes(Number(e.target.value))} className="flex-1" />
                 <span className="w-8 text-sm">{tokenBytes}</span>
               </div>
               <Segmented value={tokenFmt} onChange={setTokenFmt} options={[{ label: 'Hex', value: 'hex' }, { label: 'Base64', value: 'base64' }]} />

@@ -7,6 +7,7 @@ import {
   TextInput,
   ErrorHint,
   FileDropInput,
+  Range,
 } from '../components/ui'
 import {
   convertRadix,
@@ -133,8 +134,7 @@ export function ColorTool() {
           </Panel>
           {hsl && (
             <Panel title="色相微调">
-              <input
-                type="range"
+              <Range
                 min={0}
                 max={360}
                 value={hsl.h}
