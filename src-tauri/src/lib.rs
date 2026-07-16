@@ -1,3 +1,4 @@
+#[cfg(desktop)]
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -5,6 +6,7 @@ use tauri::{
 };
 
 /// 显示并聚焦主窗口（供托盘、单实例唤醒复用）
+#[cfg(desktop)]
 fn show_main_window(app: &tauri::AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         eprintln!("main window is unavailable");
@@ -22,11 +24,9 @@ fn show_main_window(app: &tauri::AppHandle) {
     }
 }
 
-/// 桌面端应用入口。由 `main.rs` 调用；拆分为 lib 以匹配 Cargo.toml 的
-/// `[lib] name = "devtoolbox_lib"`（Tauri v2 标准结构，便于移动端复用）。
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    tauri::Builder::default()
+#[cfg(desktop)]
+fn configure_desktop(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
+    builder
         // 确保仅运行一个实例；重复启动时显示已有主窗口。
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show_main_window(app);
@@ -81,6 +81,16 @@ pub fn run() {
                 }
             }
         })
+}
+
+/// 应用入口。由桌面端 `main.rs` 或移动端运行时调用。
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    let builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    let builder = configure_desktop(builder);
+
+    builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
