@@ -1,0 +1,229 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '已存在的版本标签，例如 v1.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release-windows:
+    name: Build and release Windows
+    runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Validate tag and project versions
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
+            throw "版本标签格式无效: $env:RELEASE_TAG"
+          }
+
+          $version = $env:RELEASE_TAG.Substring(1)
+          $packageVersion = (Get-Content -Raw package.json | ConvertFrom-Json).version
+          $tauriVersion = (Get-Content -Raw src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $cargoText = Get-Content -Raw src-tauri/Cargo.toml
+          $cargoMatch = [regex]::Match($cargoText, '(?m)^version\s*=\s*"([^"]+)"')
+          if (-not $cargoMatch.Success) {
+            throw '无法读取 src-tauri/Cargo.toml 版本号'
+          }
+          $cargoVersion = $cargoMatch.Groups[1].Value
+
+          $versions = @{
+            'package.json' = $packageVersion
+            'src-tauri/tauri.conf.json' = $tauriVersion
+            'src-tauri/Cargo.toml' = $cargoVersion
+          }
+          foreach ($entry in $versions.GetEnumerator()) {
+            if ($entry.Value -ne $version) {
+              throw "$($entry.Key) 版本为 $($entry.Value)，与标签 $env:RELEASE_TAG 不一致"
+            }
+          }
+
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Check Rust
+        run: cargo check --locked --manifest-path src-tauri/Cargo.toml
+
+      - name: Build desktop bundles
+        run: npm run tauri:build
+
+      - name: Prepare release artifacts
+        shell: pwsh
+        run: |
+          $artifactDir = Join-Path $PWD 'release-artifacts'
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+          $portablePath = 'src-tauri/target/release/devtoolbox.exe'
+          $nsisFiles = @(Get-ChildItem 'src-tauri/target/release/bundle/nsis' -Filter '*.exe' -File)
+          $msiFiles = @(Get-ChildItem 'src-tauri/target/release/bundle/msi' -Filter '*.msi' -File)
+
+          if (-not (Test-Path -LiteralPath $portablePath)) {
+            throw "未找到便携版: $portablePath"
+          }
+          if ($nsisFiles.Count -ne 1) {
+            throw "预期生成 1 个 NSIS 安装包，实际为 $($nsisFiles.Count) 个"
+          }
+          if ($msiFiles.Count -ne 1) {
+            throw "预期生成 1 个 MSI 安装包，实际为 $($msiFiles.Count) 个"
+          }
+
+          Copy-Item -LiteralPath $portablePath -Destination (
+            Join-Path $artifactDir "DevToolbox-$env:RELEASE_TAG-windows-x64-portable.exe"
+          )
+          Copy-Item -LiteralPath $nsisFiles[0].FullName -Destination (
+            Join-Path $artifactDir "DevToolbox-$env:RELEASE_TAG-windows-x64-setup.exe"
+          )
+          Copy-Item -LiteralPath $msiFiles[0].FullName -Destination (
+            Join-Path $artifactDir "DevToolbox-$env:RELEASE_TAG-windows-x64.msi"
+          )
+
+          Get-ChildItem -LiteralPath $artifactDir -File |
+            Sort-Object Name |
+            Get-FileHash -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($_.Path))" } |
+            Set-Content -Path (Join-Path $artifactDir 'SHA256SUMS.txt') -Encoding utf8
+
+      - name: Generate release notes
+        shell: pwsh
+        run: |
+          $versionTags = @(
+            git tag --merged HEAD --sort=-version:refname |
+              Where-Object { $_ -match '^v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$' }
+          )
+          $previousTag = $versionTags |
+            Where-Object { $_ -ne $env:RELEASE_TAG } |
+            Select-Object -First 1
+          $range = if ($previousTag) {
+            "$previousTag..$env:RELEASE_TAG"
+          } else {
+            $env:RELEASE_TAG
+          }
+
+          $lines = @(
+            "DevToolbox $env:RELEASE_TAG 发布，提供 Windows 安装包与单文件免安装版。"
+            ''
+            '## 提交记录'
+            ''
+          )
+          $commits = @(git log $range --no-merges --pretty=format:"%H`t%h`t%s")
+          if ($commits.Count -eq 0) {
+            $lines += '- 本版本没有新的非合并提交。'
+          } else {
+            $tick = [char]96
+            foreach ($commit in $commits) {
+              $parts = $commit -split "`t", 3
+              $fullHash = $parts[0]
+              $shortHash = $parts[1]
+              $subject = $parts[2]
+              $url = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/commit/$fullHash"
+              $lines += "- $subject ([$tick$shortHash$tick]($url))"
+            }
+          }
+
+          if ($previousTag) {
+            $compareUrl = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/compare/$previousTag...$env:RELEASE_TAG"
+            $lines += @('', "[查看完整变更]($compareUrl)")
+          }
+
+          $lines += @(
+            ''
+            '## 下载'
+            ''
+            "- ``DevToolbox-$env:RELEASE_TAG-windows-x64-portable.exe``：单文件免安装版"
+            "- ``DevToolbox-$env:RELEASE_TAG-windows-x64-setup.exe``：NSIS 安装包"
+            "- ``DevToolbox-$env:RELEASE_TAG-windows-x64.msi``：MSI 安装包"
+            '- `SHA256SUMS.txt`：文件完整性校验值'
+            ''
+            'Windows 10/11 通常已包含运行所需的 WebView2 Runtime。未签名版本可能触发 Windows SmartScreen 提示。'
+          )
+
+          Set-Content -Path release-notes.md -Value $lines -Encoding utf8
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: DevToolbox-${{ env.RELEASE_TAG }}-windows-x64
+          path: release-artifacts/*
+          if-no-files-found: error
+
+      - name: Create or update draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $assets = @(
+            Get-ChildItem -LiteralPath release-artifacts -File |
+              Sort-Object Name |
+              Select-Object -ExpandProperty FullName
+          )
+
+          gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY *> $null
+          $releaseExists = $LASTEXITCODE -eq 0
+
+          if ($releaseExists) {
+            gh release upload $env:RELEASE_TAG @assets --clobber --repo $env:GITHUB_REPOSITORY
+            if ($LASTEXITCODE -ne 0) { throw 'Release 附件上传失败' }
+            gh release edit $env:RELEASE_TAG `
+              --repo $env:GITHUB_REPOSITORY `
+              --title "DevToolbox $env:RELEASE_TAG" `
+              --notes-file release-notes.md
+            if ($LASTEXITCODE -ne 0) { throw 'Release 说明更新失败' }
+          } else {
+            gh release create $env:RELEASE_TAG @assets `
+              --repo $env:GITHUB_REPOSITORY `
+              --verify-tag `
+              --draft `
+              --title "DevToolbox $env:RELEASE_TAG" `
+              --notes-file release-notes.md
+            if ($LASTEXITCODE -ne 0) { throw 'Draft Release 创建失败' }
+          }
+
+          gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json url --jq '.url'
