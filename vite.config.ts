@@ -6,6 +6,7 @@ import path from 'node:path'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: process.env.PAGES_BASE_PATH || '/',
   plugins: [
     react(),
     VitePWA({
