@@ -30,6 +30,7 @@ import { calcSubnet, parseUserAgent } from '../core/network'
 import { HistoryMenu } from '../components/HistoryMenu'
 import { inferImageMime } from '../core/files'
 import { useLatestOperation } from '../hooks/useLatestOperation'
+import { GeneratedFileButton } from '../components/GeneratedFileButton'
 
 // ---------------- Markdown 预览 ----------------
 const MD_SAMPLE = `# 标题
@@ -189,6 +190,8 @@ export function ImageTool() {
 
   const fmtSize = (n: number) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(2)} MB`)
   const ratio = srcInfo && result ? Math.round((1 - result.size / srcInfo.size) * 100) : 0
+  const resultExtension = FORMAT_EXT[format]
+  const resultName = `${srcName.replace(/\.[^.]+$/, '') || 'image'}-converted.${resultExtension}`
 
   return (
     <ToolShell title="图片工具" description="本地压缩与格式转换（PNG / JPG / WebP），可调质量与尺寸">
@@ -275,9 +278,15 @@ export function ImageTool() {
               title="结果"
               actions={
                 result && (
-                  <a href={result.url} download={`converted.${FORMAT_EXT[format]}`}>
-                    <Button variant="primary">下载</Button>
-                  </a>
+                  <GeneratedFileButton
+                    dataUrl={result.url}
+                    fileName={resultName}
+                    filterName="图片"
+                    extensions={[resultExtension]}
+                    onError={setError}
+                  >
+                    下载
+                  </GeneratedFileButton>
                 )
               }
             >

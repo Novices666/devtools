@@ -21,6 +21,8 @@
     "@fortawesome/free-regular-svg-icons": "^7.3.0",
     "@fortawesome/free-solid-svg-icons": "^7.3.0",
     "@fortawesome/react-fontawesome": "^3.4.0",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-fs": "^2.5.1",
     "bcryptjs": "^3.0.3",
     "crypto-js": "^4.2.0",
     "js-yaml": "^4.1.0",

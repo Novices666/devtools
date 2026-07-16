@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "开发者工具箱桌面端默认权限：窗口控制、系统托盘",
+  "description": "开发者工具箱桌面端默认权限：窗口控制、系统托盘、用户选择路径的文件保存",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -10,6 +10,8 @@
     "core:window:allow-set-focus",
     "core:window:allow-close",
     "core:window:allow-minimize",
-    "core:window:allow-unminimize"
+    "core:window:allow-unminimize",
+    "dialog:allow-save",
+    "fs:allow-write-file"
   ]
 }

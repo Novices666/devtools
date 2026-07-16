@@ -31,6 +31,8 @@ fn configure_desktop(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<taur
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show_main_window(app);
         }))
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             // 系统托盘 + 右键菜单
             let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;

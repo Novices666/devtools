@@ -21,6 +21,7 @@ import {
   type Radix,
 } from '../core/convert'
 import { inferImageMime } from '../core/files'
+import { GeneratedFileButton } from '../components/GeneratedFileButton'
 import { useLatestOperation } from '../hooks/useLatestOperation'
 
 // ---------------- 进制转换 ----------------
@@ -248,13 +249,26 @@ export function QrCodeTool() {
             {dataUrl && <img src={dataUrl} alt="二维码" className="rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-700" width={220} height={220} />}
             {dataUrl && (
               <div className="flex gap-2">
-                <a href={dataUrl} download="qrcode.png">
-                  <Button variant="primary">下载 PNG</Button>
-                </a>
+                <GeneratedFileButton
+                  dataUrl={dataUrl}
+                  fileName="qrcode.png"
+                  filterName="PNG 图片"
+                  extensions={['png']}
+                  onError={setError}
+                >
+                  下载 PNG
+                </GeneratedFileButton>
                 {svgUrl && (
-                  <a href={svgUrl} download="qrcode.svg">
-                    <Button>下载 SVG</Button>
-                  </a>
+                  <GeneratedFileButton
+                    dataUrl={svgUrl}
+                    fileName="qrcode.svg"
+                    filterName="SVG 图片"
+                    extensions={['svg']}
+                    variant="ghost"
+                    onError={setError}
+                  >
+                    下载 SVG
+                  </GeneratedFileButton>
                 )}
               </div>
             )}

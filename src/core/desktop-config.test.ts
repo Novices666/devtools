@@ -15,7 +15,7 @@ describe('desktop configuration', () => {
     expect(rust.match(/TrayIconBuilder::with_id\("main"\)/g) ?? []).toHaveLength(1)
   })
 
-  it('does not expose retired file integrations', () => {
+  it('keeps file associations retired and limits file access to explicit saves', () => {
     const config = JSON.parse(readProjectFile('src-tauri/tauri.conf.json')) as {
       bundle: Record<string, unknown>
     }
@@ -27,6 +27,13 @@ describe('desktop configuration', () => {
     )
 
     expect(config.bundle.fileAssociations).toBeUndefined()
-    expect(permissionIds.some((id) => id.startsWith('fs:') || id.startsWith('dialog:'))).toBe(false)
+    expect(
+      permissionIds.filter((id) => id.startsWith('fs:') || id.startsWith('dialog:')),
+    ).toEqual(['dialog:allow-save', 'fs:allow-write-file'])
+    expect(permissionIds).not.toContain('fs:scope')
+
+    const rust = readProjectFile('src-tauri/src/lib.rs')
+    expect(rust).toContain('.plugin(tauri_plugin_dialog::init())')
+    expect(rust).toContain('.plugin(tauri_plugin_fs::init())')
   })
 })

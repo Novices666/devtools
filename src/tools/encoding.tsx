@@ -54,6 +54,7 @@ import { useEffect } from 'react'
 import { HistoryMenu } from '../components/HistoryMenu'
 import { useLatestOperation } from '../hooks/useLatestOperation'
 import { inferImageMime } from '../core/files'
+import { GeneratedFileButton } from '../components/GeneratedFileButton'
 
 function runSafe(fn: () => string): { out: string; error?: string } {
   try {
@@ -193,9 +194,15 @@ export function Base64Tool() {
               title={decodedImage ? '图片预览' : mode === 'encode' ? `${baseLabel} 输出` : `文本输出 (${characterLabel})`}
               actions={
                 decodedImage ? (
-                  <a href={decodedImage.dataUri} download={`decoded.${imgExt}`}>
-                    <Button variant="primary">下载图片</Button>
-                  </a>
+                  <GeneratedFileButton
+                    dataUrl={decodedImage.dataUri!}
+                    fileName={`decoded.${imgExt}`}
+                    filterName="图片"
+                    extensions={[imgExt]}
+                    onError={setImageError}
+                  >
+                    下载图片
+                  </GeneratedFileButton>
                 ) : (
                   <CopyButton text={out} />
                 )
