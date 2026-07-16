@@ -1,12 +1,56 @@
-import type { ComponentType } from 'react'
-import { JsonTool } from './tools/json'
-import { YamlTool, CsvTool, XmlTool, TomlTool, SqlTool, JsonTypesTool } from './tools/formats'
-import { Base64Tool, UrlTool, UrlJsonTool, HtmlEntityTool, UnicodeTool, JwtTool } from './tools/encoding'
-import { HashTool, HmacTool, AesTool, BcryptTool, PasswordTool, RsaTool } from './tools/crypto'
-import { TimestampTool, CronTool, IdTool, SnowflakeTool } from './tools/time'
-import { DiffTool, RegexTool, TextTransformTool } from './tools/text'
-import { RadixTool, ColorTool, QrCodeTool } from './tools/convert'
-import { MarkdownTool, MockTool, SubnetTool, UserAgentTool, ImageTool } from './tools/misc'
+import { lazy, type ComponentType } from 'react'
+
+type ToolModule = Record<string, unknown>
+
+function lazyTool(loader: () => Promise<ToolModule>, exportName: string): ComponentType {
+  return lazy(async () => ({
+    default: (await loader())[exportName] as ComponentType,
+  })) as ComponentType
+}
+
+const loadJsonTools = () => import('./tools/json')
+const loadFormatTools = () => import('./tools/formats')
+const loadEncodingTools = () => import('./tools/encoding')
+const loadCryptoTools = () => import('./tools/crypto')
+const loadTimeTools = () => import('./tools/time')
+const loadTextTools = () => import('./tools/text')
+const loadConvertTools = () => import('./tools/convert')
+const loadMiscTools = () => import('./tools/misc')
+
+const JsonTool = lazyTool(loadJsonTools, 'JsonTool')
+const YamlTool = lazyTool(loadFormatTools, 'YamlTool')
+const CsvTool = lazyTool(loadFormatTools, 'CsvTool')
+const XmlTool = lazyTool(loadFormatTools, 'XmlTool')
+const TomlTool = lazyTool(loadFormatTools, 'TomlTool')
+const SqlTool = lazyTool(loadFormatTools, 'SqlTool')
+const JsonTypesTool = lazyTool(loadFormatTools, 'JsonTypesTool')
+const Base64Tool = lazyTool(loadEncodingTools, 'Base64Tool')
+const UrlTool = lazyTool(loadEncodingTools, 'UrlTool')
+const UrlJsonTool = lazyTool(loadEncodingTools, 'UrlJsonTool')
+const HtmlEntityTool = lazyTool(loadEncodingTools, 'HtmlEntityTool')
+const UnicodeTool = lazyTool(loadEncodingTools, 'UnicodeTool')
+const JwtTool = lazyTool(loadEncodingTools, 'JwtTool')
+const HashTool = lazyTool(loadCryptoTools, 'HashTool')
+const HmacTool = lazyTool(loadCryptoTools, 'HmacTool')
+const AesTool = lazyTool(loadCryptoTools, 'AesTool')
+const BcryptTool = lazyTool(loadCryptoTools, 'BcryptTool')
+const PasswordTool = lazyTool(loadCryptoTools, 'PasswordTool')
+const RsaTool = lazyTool(loadCryptoTools, 'RsaTool')
+const TimestampTool = lazyTool(loadTimeTools, 'TimestampTool')
+const CronTool = lazyTool(loadTimeTools, 'CronTool')
+const IdTool = lazyTool(loadTimeTools, 'IdTool')
+const SnowflakeTool = lazyTool(loadTimeTools, 'SnowflakeTool')
+const DiffTool = lazyTool(loadTextTools, 'DiffTool')
+const RegexTool = lazyTool(loadTextTools, 'RegexTool')
+const TextTransformTool = lazyTool(loadTextTools, 'TextTransformTool')
+const RadixTool = lazyTool(loadConvertTools, 'RadixTool')
+const ColorTool = lazyTool(loadConvertTools, 'ColorTool')
+const QrCodeTool = lazyTool(loadConvertTools, 'QrCodeTool')
+const MarkdownTool = lazyTool(loadMiscTools, 'MarkdownTool')
+const MockTool = lazyTool(loadMiscTools, 'MockTool')
+const SubnetTool = lazyTool(loadMiscTools, 'SubnetTool')
+const UserAgentTool = lazyTool(loadMiscTools, 'UserAgentTool')
+const ImageTool = lazyTool(loadMiscTools, 'ImageTool')
 
 export type ToolCategory =
   | 'format'

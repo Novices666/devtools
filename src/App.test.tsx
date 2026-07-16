@@ -40,7 +40,8 @@ describe('application file drop', () => {
 
   it('lets a tool input handle its own drop without triggering whole-window routing', async () => {
     localStorage.setItem('devtoolbox:current', JSON.stringify('hash'))
-    const { getByRole, getAllByRole, queryByRole } = render(<App />)
+    const { findByRole, getByRole, getAllByRole, queryByRole } = render(<App />)
+    await findByRole('heading', { name: '哈希计算' })
     const input = getAllByRole('textbox').find(
       (element) => element instanceof HTMLTextAreaElement,
     ) as HTMLTextAreaElement

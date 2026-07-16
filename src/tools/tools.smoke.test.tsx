@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { cleanup, render, act, fireEvent, waitFor } from '@testing-library/react'
+import { Suspense, type ComponentType } from 'react'
 import { TOOLS } from '../registry'
 import { SettingsPanel } from '../components/SettingsPanel'
 import { FileDropInput, TextArea } from '../components/ui'
@@ -26,6 +27,16 @@ function beforeAllMocks() {
 }
 
 afterEach(() => cleanup())
+
+async function renderTool(Component: ComponentType) {
+  const result = render(
+    <Suspense fallback={<div data-testid="tool-loading" />}>
+      <Component />
+    </Suspense>,
+  )
+  await waitFor(() => expect(result.queryByTestId('tool-loading')).toBeNull())
+  return result
+}
 
 describe('工具组件冒烟测试', () => {
   it('图片文件拖放组件只接管符合类型的文件', () => {
@@ -110,9 +121,9 @@ describe('工具组件冒烟测试', () => {
     expect(onFileText).toHaveBeenCalledTimes(1)
   })
 
-  it('Diff 工具将超限计算显示为错误提示', () => {
+  it('Diff 工具将超限计算显示为错误提示', async () => {
     const DiffTool = TOOLS.find((tool) => tool.id === 'diff')!.component
-    const { getAllByRole, getByText } = render(<DiffTool />)
+    const { getAllByRole, getByText } = await renderTool(DiffTool)
     const textareas = getAllByRole('textbox') as HTMLTextAreaElement[]
     const largeText = 'a'.repeat(1500)
 
@@ -125,7 +136,7 @@ describe('工具组件冒烟测试', () => {
 
   it('哈希工具按拖放目标区分文件哈希与文本输入', async () => {
     const HashTool = TOOLS.find((tool) => tool.id === 'hash')!.component
-    const { getByText, getByRole, queryByText } = render(<HashTool />)
+    const { getByText, getByRole, queryByText } = await renderTool(HashTool)
     const binaryFile = new File(['abc'], 'sample.bin', { type: 'application/octet-stream' })
     Object.defineProperty(binaryFile, 'arrayBuffer', {
       value: vi.fn().mockResolvedValue(new TextEncoder().encode('abc').buffer),
@@ -157,7 +168,7 @@ describe('工具组件冒烟测试', () => {
       value: vi.fn().mockResolvedValue(new TextEncoder().encode('second').buffer),
     })
     const HashTool = TOOLS.find((tool) => tool.id === 'hash')!.component
-    const { getByText, queryByText } = render(<HashTool />)
+    const { getByText, queryByText } = await renderTool(HashTool)
     const dropTarget = getByText('选择文件').closest('label')!
 
     fireEvent.drop(dropTarget, {
@@ -175,8 +186,8 @@ describe('工具组件冒烟测试', () => {
 
   it.each(TOOLS.map((t) => [t.id, t.name, t.component] as const))(
     '渲染 %s (%s) 不应抛错',
-    (_id, _name, Component) => {
-      expect(() => render(<Component />)).not.toThrow()
+    async (_id, _name, Component) => {
+      await expect(renderTool(Component)).resolves.toBeTruthy()
     },
   )
 
@@ -187,9 +198,9 @@ describe('工具组件冒烟测试', () => {
     expect(ids.size).toBe(TOOLS.length) // id 无重复
   })
 
-  it('Base 工具可切换制式与字符编码', () => {
+  it('Base 工具可切换制式与字符编码', async () => {
     const BaseTool = TOOLS.find((t) => t.id === 'base64')!.component
-    const { getAllByRole } = render(<BaseTool />)
+    const { getAllByRole } = await renderTool(BaseTool)
     const selects = getAllByRole('combobox') as HTMLSelectElement[]
     const textareas = getAllByRole('textbox') as HTMLTextAreaElement[]
 
@@ -202,9 +213,9 @@ describe('工具组件冒烟测试', () => {
     expect(textareas[1].value).toBe('MBHX2WI=')
   })
 
-  it('Base64 图片 Data URI 不显示文本解码错误', () => {
+  it('Base64 图片 Data URI 不显示文本解码错误', async () => {
     const BaseTool = TOOLS.find((t) => t.id === 'base64')!.component
-    const { getByRole, getAllByRole, getByText, queryByText } = render(<BaseTool />)
+    const { getByRole, getAllByRole, getByText, queryByText } = await renderTool(BaseTool)
 
     fireEvent.click(getByRole('button', { name: '解码' }))
     fireEvent.change(getAllByRole('textbox')[0], {
@@ -227,7 +238,7 @@ describe('工具组件冒烟测试', () => {
       value: vi.fn().mockResolvedValue(Uint8Array.from([...pngHeader, 2]).buffer),
     })
     const BaseTool = TOOLS.find((tool) => tool.id === 'base64')!.component
-    const { getByText, getAllByRole } = render(<BaseTool />)
+    const { getByText, getAllByRole } = await renderTool(BaseTool)
     const dropTarget = getByText('图片转 Base64').closest('label')!
 
     fireEvent.drop(dropTarget, {
@@ -245,7 +256,7 @@ describe('工具组件冒烟测试', () => {
 
   it('URL 参数解析结果可复制为 JSON', async () => {
     const UrlTool = TOOLS.find((t) => t.id === 'url')!.component
-    const { getByRole } = render(<UrlTool />)
+    const { getByRole } = await renderTool(UrlTool)
     const writeText = vi.mocked(navigator.clipboard.writeText)
     writeText.mockClear()
 
@@ -265,9 +276,9 @@ describe('工具组件冒烟测试', () => {
     )
   })
 
-  it('独立 URL 参数与 JSON 工具支持双向转换', () => {
+  it('独立 URL 参数与 JSON 工具支持双向转换', async () => {
     const UrlJsonTool = TOOLS.find((t) => t.id === 'url-json')!.component
-    const { getByRole, getAllByRole } = render(<UrlJsonTool />)
+    const { getByRole, getAllByRole } = await renderTool(UrlJsonTool)
     const textareas = getAllByRole('textbox') as HTMLTextAreaElement[]
 
     fireEvent.change(textareas[0], { target: { value: '?tag=one&tag=two&page=2' } })
@@ -280,9 +291,9 @@ describe('工具组件冒烟测试', () => {
     expect(textareas[1].value).toBe('tag=one&tag=two&page=2')
   })
 
-  it('URL 参数与 JSON 工具拒绝普通文本输入', () => {
+  it('URL 参数与 JSON 工具拒绝普通文本输入', async () => {
     const UrlJsonTool = TOOLS.find((t) => t.id === 'url-json')!.component
-    const { getAllByRole, getByText } = render(<UrlJsonTool />)
+    const { getAllByRole, getByText } = await renderTool(UrlJsonTool)
 
     fireEvent.change(getAllByRole('textbox')[0], { target: { value: 'ordinary text' } })
 
@@ -302,10 +313,10 @@ describe('设置面板', () => {
     expect(getByText('历史记录')).toBeTruthy()
     expect(getAllByRole('switch')).toHaveLength(1)
   })
-  it('切换手动模式后再渲染工具不报错', () => {
+  it('切换手动模式后再渲染工具不报错', async () => {
     act(() => setSettings({ processMode: 'manual' }))
     const Json = TOOLS.find((t) => t.id === 'json')!.component
-    expect(() => render(<Json />)).not.toThrow()
+    await expect(renderTool(Json)).resolves.toBeTruthy()
     act(() => setSettings({ processMode: 'auto' })) // 复位
   })
 })

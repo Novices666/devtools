@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useCallback, type DragEvent } from 'react'
+import { Suspense, useMemo, useRef, useState, useCallback, type DragEvent } from 'react'
 import {
   TOOLS,
   TOOL_MAP,
@@ -277,7 +277,18 @@ export function App() {
         )}
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
           <OpenFileInputProvider file={openedFile?.toolId === current.id ? openedFile : null}>
-            <ToolComponent key={current.id} />
+            <Suspense
+              fallback={
+                <div
+                  role="status"
+                  className="flex min-h-24 items-center justify-center text-sm text-slate-400"
+                >
+                  正在加载工具…
+                </div>
+              }
+            >
+              <ToolComponent key={current.id} />
+            </Suspense>
           </OpenFileInputProvider>
         </main>
       </div>
