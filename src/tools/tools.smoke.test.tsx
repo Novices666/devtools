@@ -300,8 +300,7 @@ describe('设置面板', () => {
     const { getByText, getAllByRole } = render(<SettingsPanel open onClose={() => {}} />)
     expect(getByText('处理模式')).toBeTruthy()
     expect(getByText('历史记录')).toBeTruthy()
-    // 至少有开关组件（role=switch）
-    expect(getAllByRole('switch').length).toBeGreaterThanOrEqual(2)
+    expect(getAllByRole('switch')).toHaveLength(1)
   })
   it('切换手动模式后再渲染工具不报错', () => {
     act(() => setSettings({ processMode: 'manual' }))

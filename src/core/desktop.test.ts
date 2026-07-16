@@ -3,7 +3,6 @@ import {
   isDesktop,
   platform,
   onOpenFile,
-  onClipboardChanged,
   resolveOpenFileTool,
 } from './desktop'
 
@@ -15,13 +14,10 @@ describe('desktop bridge (web fallback)', () => {
   })
   it('subscriptions return no-op unsubscribe without throwing', () => {
     const off1 = onOpenFile(() => {})
-    const off3 = onClipboardChanged(() => {})
     expect(typeof off1).toBe('function')
-    expect(typeof off3).toBe('function')
     // 调用取消订阅不应抛错
     expect(() => {
       off1()
-      off3()
     }).not.toThrow()
   })
 })

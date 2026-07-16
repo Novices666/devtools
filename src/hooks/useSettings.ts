@@ -1,7 +1,7 @@
 import { useCallback, useSyncExternalStore } from 'react'
 
 /**
- * 全局设置：处理模式（自动/手动）、历史记录开关、剪贴板识别开关等。
+ * 全局设置：处理模式（自动/手动）、历史记录开关。
  * 采用轻量的模块级 store + useSyncExternalStore，使非组件模块（如 useToolHistory）
  * 也能读取当前设置，无需 Context 层层传递。持久化到 localStorage。
  */
@@ -13,8 +13,6 @@ export interface Settings {
   processMode: ProcessMode
   /** 是否记录工具输入历史 */
   historyEnabled: boolean
-  /** 是否启用剪贴板智能识别横幅 */
-  clipboardDetect: boolean
 }
 
 const STORAGE_KEY = 'devtoolbox:settings'
@@ -22,14 +20,22 @@ const STORAGE_KEY = 'devtoolbox:settings'
 const DEFAULT_SETTINGS: Settings = {
   processMode: 'auto',
   historyEnabled: true,
-  clipboardDetect: true,
+}
+
+function normalize(value: Partial<Settings>): Settings {
+  return {
+    processMode: value.processMode === 'manual' ? 'manual' : 'auto',
+    historyEnabled: typeof value.historyEnabled === 'boolean' ? value.historyEnabled : true,
+  }
 }
 
 function load(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return DEFAULT_SETTINGS
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) }
+    const settings = normalize(JSON.parse(raw) as Partial<Settings>)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+    return settings
   } catch {
     return DEFAULT_SETTINGS
   }
@@ -57,7 +63,7 @@ export function getSettings(): Settings {
 
 /** 更新设置（部分字段合并） */
 export function setSettings(patch: Partial<Settings>): void {
-  current = { ...current, ...patch }
+  current = normalize({ ...current, ...patch })
   persist()
   emit()
 }

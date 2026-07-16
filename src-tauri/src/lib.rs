@@ -5,7 +5,6 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager,
 };
-use tauri_plugin_clipboard_manager::ClipboardExt;
 
 const MAX_OPEN_TEXT_FILE_SIZE: u64 = 16 * 1024 * 1024;
 
@@ -65,32 +64,6 @@ fn take_pending_open_files(state: tauri::State<'_, PendingOpenFiles>) -> Vec<Ope
         .unwrap_or_default()
 }
 
-/// 在后台线程轮询系统剪贴板，文本变化时向前端发送 `clipboard-changed`
-/// 事件（payload 为剪贴板文本）。与前端 src/core/desktop.ts 的
-/// onClipboardChanged 契约一致。轮询而非系统级监听，避免平台差异与额外依赖。
-fn start_clipboard_watch(app: &tauri::AppHandle) {
-    let handle = app.clone();
-    std::thread::spawn(move || {
-        // 以启动时的剪贴板内容为基线，避免刚启动就把旧内容当成“变化”推送
-        let mut last = handle.clipboard().read_text().unwrap_or_default();
-        loop {
-            std::thread::sleep(std::time::Duration::from_millis(800));
-            match handle.clipboard().read_text() {
-                Ok(text) => {
-                    if text != last {
-                        last = text.clone();
-                        if !text.is_empty() {
-                            let _ = handle.emit("clipboard-changed", text);
-                        }
-                    }
-                }
-                // 剪贴板为空 / 非文本 / 读取失败：忽略，保留上次基线
-                Err(_) => {}
-            }
-        }
-    });
-}
-
 /// 桌面端应用入口。由 `main.rs` 调用；拆分为 lib 以匹配 Cargo.toml 的
 /// `[lib] name = "devtoolbox_lib"`（Tauri v2 标准结构，便于移动端复用）。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -98,7 +71,6 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_clipboard_manager::init())
         // 单实例：第二次启动时把参数（如双击的文件）转交给已运行实例
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             show_main_window(app);
@@ -106,8 +78,6 @@ pub fn run() {
         }))
         .invoke_handler(tauri::generate_handler![take_pending_open_files])
         .setup(|app| {
-            let handle = app.handle();
-
             // 冷启动参数先暂存，待前端建立事件订阅后主动领取。
             let args: Vec<String> = std::env::args().collect();
             app.manage(PendingOpenFiles(Mutex::new(opened_files_from_args(&args))));
@@ -138,9 +108,6 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
-
-            // 后台轮询系统剪贴板，变化时推送给前端（智能识别用）
-            start_clipboard_watch(&handle);
 
             Ok(())
         })

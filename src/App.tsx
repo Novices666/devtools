@@ -9,10 +9,8 @@ import {
 } from './registry'
 import { useTheme, type Theme } from './hooks/useTheme'
 import { useLocalStorage } from './hooks/useLocalStorage'
-import { useSettings } from './hooks/useSettings'
 import { SettingsPanel } from './components/SettingsPanel'
-import { detectContent } from './core/detect'
-import { isDesktop, onOpenFile, onClipboardChanged, resolveOpenFileTool } from './core/desktop'
+import { isDesktop, onOpenFile, resolveOpenFileTool } from './core/desktop'
 import { readTextFile } from './core/files'
 import { useLatestOperation } from './hooks/useLatestOperation'
 import {
@@ -24,7 +22,6 @@ import {
   faToolbox,
   faBars,
   faXmark,
-  faClipboard,
   faStar as faStarSolid,
   faGear,
   faSun,
@@ -65,12 +62,10 @@ export function App() {
   const [query, setQuery] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [suggestion, setSuggestion] = useState<{ toolId: string; label: string } | null>(null)
   const [openedFile, setOpenedFile] = useState<OpenedTextFile | null>(null)
   const [openFileError, setOpenFileError] = useState<string>()
   const searchRef = useRef<HTMLInputElement>(null)
   const openedFileIdRef = useRef(0)
-  const [settings] = useSettings()
   const { begin: beginWindowFileRead, cancel: cancelWindowFileRead } = useLatestOperation()
 
   const current = TOOL_MAP[currentId] ?? TOOLS[0]
@@ -122,50 +117,15 @@ export function App() {
     [beginWindowFileRead, openTextFile],
   )
 
-  // 剪贴板智能识别：读取剪贴板并推荐匹配工具
-  const detectClipboard = useCallback(async () => {
-    if (!settings.clipboardDetect) {
-      setSuggestion({ toolId: '', label: '剪贴板识别已在设置中关闭' })
-      setTimeout(() => setSuggestion(null), 4000)
-      return
-    }
-    setSuggestion(null)
-    try {
-      const text = await navigator.clipboard.readText()
-      const hits = detectContent(text)
-      if (hits.length > 0 && TOOL_MAP[hits[0].toolId]) {
-        setSuggestion({ toolId: hits[0].toolId, label: hits[0].label })
-      } else {
-        setSuggestion({ toolId: '', label: '未能识别剪贴板内容' })
-      }
-    } catch {
-      setSuggestion({ toolId: '', label: '无法读取剪贴板（需授权）' })
-    }
-    setTimeout(() => setSuggestion(null), 6000)
-  }, [settings.clipboardDetect])
-
-  // 桌面端（Tauri）原生事件桥接：文件关联打开、系统剪贴板监听。
-  // Web 环境下 onXxx 均为 no-op，不产生副作用。
+  // 桌面端（Tauri）文件关联桥接；Web 环境下为 no-op。
   useEffect(() => {
     // 文件关联：双击 .json/.txt 等打开 → 按内容识别并跳转到对应工具，回填输入
     const offOpen = onOpenFile(({ path, content }) => {
       cancelWindowFileRead()
       openTextFile(path, content)
     })
-    // 系统剪贴板监听：仅在设置开启时推荐
-    const offClip = onClipboardChanged((text) => {
-      if (!settings.clipboardDetect) return
-      const hits = detectContent(text)
-      if (hits.length > 0 && TOOL_MAP[hits[0].toolId]) {
-        setSuggestion({ toolId: hits[0].toolId, label: hits[0].label })
-        setTimeout(() => setSuggestion(null), 6000)
-      }
-    })
-    return () => {
-      offOpen()
-      offClip()
-    }
-  }, [cancelWindowFileRead, openTextFile, settings.clipboardDetect])
+    return offOpen
+  }, [cancelWindowFileRead, openTextFile])
 
   const favTools = favorites.map((id) => TOOL_MAP[id]).filter(Boolean)
   const ToolComponent = current.component
@@ -296,14 +256,6 @@ export function App() {
           </div>
           <button
             type="button"
-            onClick={detectClipboard}
-            title="识别剪贴板内容并推荐工具"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-base transition-colors hover:bg-slate-200/70 dark:hover:bg-slate-700/60"
-          >
-            <FontAwesomeIcon icon={faClipboard} />
-          </button>
-          <button
-            type="button"
             onClick={() => toggleFavorite(current.id)}
             title={favorites.includes(current.id) ? '取消收藏' : '收藏当前工具'}
             className="inline-flex h-9 w-9 items-center justify-center rounded-md text-base transition-colors hover:bg-slate-200/70 dark:hover:bg-slate-700/60"
@@ -320,33 +272,6 @@ export function App() {
             <FontAwesomeIcon icon={faGear} />
           </button>
         </header>
-        {suggestion && (
-          <div className="flex items-center gap-3 border-b border-sky-200 bg-sky-50 px-4 py-2 text-sm dark:border-sky-900/50 dark:bg-sky-900/20">
-            <span className="text-slate-600 dark:text-slate-300">
-              {suggestion.toolId ? (
-                <>剪贴板内容疑似 <span className="font-medium text-sky-600 dark:text-sky-400">{suggestion.label}</span></>
-              ) : (
-                suggestion.label
-              )}
-            </span>
-            {suggestion.toolId && (
-              <button
-                type="button"
-                onClick={() => { selectTool(suggestion.toolId); setSuggestion(null) }}
-                className="rounded-md bg-sky-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-sky-600"
-              >
-                打开 {TOOL_MAP[suggestion.toolId]?.name}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setSuggestion(null)}
-              className="ml-auto text-slate-400 hover:text-slate-600"
-            >
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
-          </div>
-        )}
         {openFileError && (
           <div className="flex items-center border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
             <span>文件打开失败：{openFileError}</span>

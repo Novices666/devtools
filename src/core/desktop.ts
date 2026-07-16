@@ -91,24 +91,3 @@ export function onOpenFile(handler: (payload: OpenFilePayload) => void): () => v
     dispose?.()
   }
 }
-
-/**
- * 订阅系统剪贴板变化（桌面端由 Rust 侧轮询/监听后推送）。
- * Rust 侧以 `clipboard-changed` 事件发送剪贴板文本。
- */
-export function onClipboardChanged(handler: (text: string) => void): () => void {
-  if (!isDesktop()) return () => {}
-  let cancelled = false
-  let dispose: (() => void) | null = null
-  void import('@tauri-apps/api/event')
-    .then(({ listen }) => listen<string>('clipboard-changed', (event) => handler(String(event.payload ?? ''))))
-    .then((unlisten) => {
-      if (cancelled) unlisten()
-      else dispose = unlisten
-    })
-    .catch(() => {})
-  return () => {
-    cancelled = true
-    dispose?.()
-  }
-}

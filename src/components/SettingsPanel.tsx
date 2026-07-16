@@ -10,7 +10,7 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-/** 集中设置面板：主题、处理模式、历史开关、剪贴板识别开关。以抽屉形式弹出。 */
+/** 集中设置面板：主题、处理模式、历史开关。以抽屉形式弹出。 */
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const [settings, update] = useSettings()
   const { theme, setTheme } = useTheme()
@@ -70,14 +70,6 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               checked={settings.historyEnabled}
               onChange={(v) => update({ historyEnabled: v })}
               label="启用历史记录"
-            />
-          </Row>
-
-          <Row label="剪贴板识别" hint="顶部横幅根据剪贴板内容推荐工具">
-            <Toggle
-              checked={settings.clipboardDetect}
-              onChange={(v) => update({ clipboardDetect: v })}
-              label="启用剪贴板识别"
             />
           </Row>
 

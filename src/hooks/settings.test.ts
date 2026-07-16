@@ -1,17 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { getSettings, setSettings } from './useSettings'
+import { getSettings, setSettings, type Settings } from './useSettings'
 
 describe('settings store', () => {
   beforeEach(() => {
     // 复位到默认
-    setSettings({ processMode: 'auto', historyEnabled: true, clipboardDetect: true })
+    setSettings({ processMode: 'auto', historyEnabled: true })
   })
 
   it('has sensible defaults', () => {
     const s = getSettings()
     expect(s.processMode).toBe('auto')
     expect(s.historyEnabled).toBe(true)
-    expect(s.clipboardDetect).toBe(true)
   })
 
   it('merges partial updates', () => {
@@ -25,9 +24,17 @@ describe('settings store', () => {
   })
 
   it('persists to localStorage', () => {
-    setSettings({ clipboardDetect: false })
+    setSettings({ processMode: 'manual' })
     const raw = localStorage.getItem('devtoolbox:settings')
     expect(raw).toBeTruthy()
-    expect(JSON.parse(raw!).clipboardDetect).toBe(false)
+    expect(JSON.parse(raw!).processMode).toBe('manual')
+  })
+
+  it('only persists supported settings', () => {
+    setSettings({ historyEnabled: false, clipboardDetect: true } as Partial<Settings> & { clipboardDetect: boolean })
+    expect(JSON.parse(localStorage.getItem('devtoolbox:settings')!)).toEqual({
+      processMode: 'auto',
+      historyEnabled: false,
+    })
   })
 })
