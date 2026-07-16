@@ -29,7 +29,7 @@ export function uuidV1(): string {
   }
   // 100 纳秒间隔自 1582-10-15 起
   const GREGORIAN_OFFSET = 122192928000000000n
-  let now = Date.now()
+  const now = Date.now()
   if (now <= _v1Last) {
     _v1ClockSeq = (_v1ClockSeq + 1) & 0x3fff
   }

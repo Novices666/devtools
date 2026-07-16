@@ -13,7 +13,7 @@ export function parseToml(input: string): Record<string, Json> {
   const root: Record<string, Json> = {}
   let current: Record<string, Json> = root
   const lines = input.split(/\r\n|\r|\n/)
-  for (let raw of lines) {
+  for (const raw of lines) {
     const line = stripComment(raw).trim()
     if (line === '') continue
     // 数组表 [[a.b]]

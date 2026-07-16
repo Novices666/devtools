@@ -47,7 +47,7 @@ export function HashTool() {
     }
   }
 
-  const useTextInput = (text: string) => {
+  const handleTextInput = (text: string) => {
     cancelFileHash()
     setInput(text)
     setFileHash(null)
@@ -85,7 +85,7 @@ export function HashTool() {
         </div>
       </Panel>
       <Panel title="输入文本" className="min-h-0 flex-1">
-        <TextArea value={input} onChange={(e) => useTextInput(e.target.value)} onFileText={(t) => useTextInput(t)} placeholder="输入文本进行哈希" className="min-h-[120px]" />
+        <TextArea value={input} onChange={(e) => handleTextInput(e.target.value)} onFileText={(t) => handleTextInput(t)} placeholder="输入文本进行哈希" className="min-h-[120px]" />
       </Panel>
     </ToolShell>
   )

@@ -136,7 +136,7 @@ export function parseMarkdownTable(input: string): string[][] {
   if (lines.length === 0) return []
   const splitRow = (line: string): string[] => {
     // 去掉首尾管道，按未转义管道切分
-    let s = line.replace(/^\s*\|/, '').replace(/\|\s*$/, '')
+    const s = line.replace(/^\s*\|/, '').replace(/\|\s*$/, '')
     const cells: string[] = []
     let buf = ''
     for (let i = 0; i < s.length; i++) {
@@ -240,7 +240,7 @@ function unescapeXml(s: string): string {
 /** 将 XML 解析为节点树，出错时抛出带位置信息的异常 */
 export function parseXml(input: string): XmlNode {
   // 去除声明、注释、CDATA 处理
-  let xml = input.replace(/<\?[\s\S]*?\?>/g, '').replace(/<!--[\s\S]*?-->/g, '')
+  const xml = input.replace(/<\?[\s\S]*?\?>/g, '').replace(/<!--[\s\S]*?-->/g, '')
   const roots: XmlNode[] = []
   const stack: XmlNode[] = []
   let i = 0
@@ -435,6 +435,7 @@ const NEWLINE_BEFORE = new Set([
   // 方言子句也换行
   'RETURNING', 'ON CONFLICT', 'ON DUPLICATE KEY UPDATE',
 ])
+const SQL_MASK_MARKER = '\uE000'
 
 /** 轻量 SQL 美化：关键字大写并在主要子句前换行；按方言追加专属关键字 */
 export function formatSql(input: string, uppercase = true, dialect: SqlDialect = 'standard'): string {
@@ -454,7 +455,7 @@ export function formatSql(input: string, uppercase = true, dialect: SqlDialect =
     const re = new RegExp(kw.replace(/ /g, '\\s+'), 'g')
     sql = sql.replace(re, () => {
       masks.push(kw)
-      return ` ${masks.length - 1} `
+      return `${SQL_MASK_MARKER}${masks.length - 1}${SQL_MASK_MARKER}`
     })
   }
   // 子句换行
@@ -465,7 +466,7 @@ export function formatSql(input: string, uppercase = true, dialect: SqlDialect =
   // AND / OR 缩进
   sql = sql.replace(/\n(AND|OR)\b/g, '\n  $1')
   // 还原被保护的关键字
-  sql = sql.replace(/ (\d+) /g, (_, i) => masks[Number(i)])
+  sql = sql.replace(new RegExp(`${SQL_MASK_MARKER}(\\d+)${SQL_MASK_MARKER}`, 'g'), (_, i) => masks[Number(i)])
   return sql.trim()
 }
 

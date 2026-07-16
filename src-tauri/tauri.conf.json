@@ -26,13 +26,6 @@
     ],
     "security": {
       "csp": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'"
-    },
-    "trayIcon": {
-      "id": "main",
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true,
-      "tooltip": "开发者工具箱",
-      "menuOnLeftClick": false
     }
   },
   "bundle": {

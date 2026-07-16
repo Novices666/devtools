@@ -6,10 +6,19 @@ use tauri::{
 
 /// 显示并聚焦主窗口（供托盘、单实例唤醒复用）
 fn show_main_window(app: &tauri::AppHandle) {
-    if let Some(win) = app.get_webview_window("main") {
-        let _ = win.show();
-        let _ = win.unminimize();
-        let _ = win.set_focus();
+    let Some(window) = app.get_webview_window("main") else {
+        eprintln!("main window is unavailable");
+        return;
+    };
+
+    for (action, result) in [
+        ("show", window.show()),
+        ("unminimize", window.unminimize()),
+        ("focus", window.set_focus()),
+    ] {
+        if let Err(error) = result {
+            eprintln!("failed to {action} main window: {error}");
+        }
     }
 }
 
@@ -22,16 +31,20 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show_main_window(app);
         }))
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             // 系统托盘 + 右键菜单
             let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+            let icon = app.default_window_icon().cloned().ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "default window icon is not configured",
+                )
+            })?;
 
             TrayIconBuilder::with_id("main")
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(icon)
                 .tooltip("开发者工具箱")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
@@ -58,8 +71,13 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {
-                    let _ = window.hide();
-                    api.prevent_close();
+                    match window.hide() {
+                        Ok(()) => api.prevent_close(),
+                        Err(error) => {
+                            eprintln!("failed to hide main window: {error}");
+                            window.app_handle().exit(1);
+                        }
+                    }
                 }
             }
         })
