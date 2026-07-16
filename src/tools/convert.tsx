@@ -20,6 +20,8 @@ import {
   hslToRgb,
   type Radix,
 } from '../core/convert'
+import { inferImageMime } from '../core/files'
+import { useLatestOperation } from '../hooks/useLatestOperation'
 
 // ---------------- 进制转换 ----------------
 export function RadixTool() {
@@ -158,6 +160,7 @@ export function QrCodeTool() {
   const [error, setError] = useState<string>()
   const [decodeError, setDecodeError] = useState<string>()
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const { begin: beginDecode, cancel: cancelDecode } = useLatestOperation()
 
   useEffect(() => {
     let cancelled = false
@@ -187,12 +190,15 @@ export function QrCodeTool() {
   }, [text])
 
   const onDecodeFile = (file: File) => {
+    const isLatest = beginDecode()
     setDecoded(undefined)
     setDecodeError(undefined)
     const reader = new FileReader()
     reader.onload = () => {
+      if (!isLatest()) return
       const img = new Image()
       img.onload = async () => {
+        if (!isLatest()) return
         try {
           const canvas = canvasRef.current
           if (!canvas) throw new Error('二维码画布不可用')
@@ -203,6 +209,7 @@ export function QrCodeTool() {
           ctx.drawImage(img, 0, 0)
           const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
           const jsQR = (await import('jsqr')).default
+          if (!isLatest()) return
           const result = jsQR(imgData.data, imgData.width, imgData.height)
           if (result) {
             setDecoded(result.data)
@@ -211,14 +218,23 @@ export function QrCodeTool() {
             setDecodeError('未能识别二维码')
           }
         } catch (reason) {
-          setDecodeError((reason as Error).message)
+          if (isLatest()) setDecodeError((reason as Error).message)
         }
       }
-      img.onerror = () => setDecodeError('图片解码失败')
-      img.src = String(reader.result)
+      img.onerror = () => {
+        if (isLatest()) setDecodeError('图片解码失败')
+      }
+      const mime = inferImageMime(file)
+      img.src = mime
+        ? String(reader.result).replace(/^data:[^;,]*/, `data:${mime}`)
+        : String(reader.result)
     }
-    reader.onerror = () => setDecodeError('图片读取失败')
-    reader.onabort = () => setDecodeError('图片读取已取消')
+    reader.onerror = () => {
+      if (isLatest()) setDecodeError('图片读取失败')
+    }
+    reader.onabort = () => {
+      if (isLatest()) setDecodeError('图片读取已取消')
+    }
     reader.readAsDataURL(file)
   }
 
@@ -249,6 +265,7 @@ export function QrCodeTool() {
             accept="image/*"
             onFile={onDecodeFile}
             onReject={() => {
+              cancelDecode()
               setDecoded(undefined)
               setDecodeError('请选择图片文件')
             }}

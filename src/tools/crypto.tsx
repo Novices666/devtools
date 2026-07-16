@@ -18,6 +18,7 @@ import { hashAll, hashArrayBuffer, hmac, HASH_ALGOS, type HashAlgo, type HmacOut
 import { aesEncrypt, aesDecrypt, generatePassword, generateToken, type AesMode, type AesPadding, type KeyFormat, type PasswordOptions } from '../core/crypto'
 import { generateRsaKeyPair, rsaEncrypt, rsaDecrypt } from '../core/rsa'
 import bcrypt from 'bcryptjs'
+import { useLatestOperation } from '../hooks/useLatestOperation'
 
 // ---------- 哈希 ----------
 export function HashTool() {
@@ -26,24 +27,28 @@ export function HashTool() {
   const [fileHash, setFileHash] = useState<Record<HashAlgo, string> | null>(null)
   const [fileName, setFileName] = useState('')
   const [fileError, setFileError] = useState<string>()
+  const { begin: beginFileHash, cancel: cancelFileHash } = useLatestOperation()
 
   const hashes = useMemo(() => (input ? hashAll(input) : null), [input])
   const shown = fileHash ?? hashes
 
   async function onFile(file: File) {
+    const isLatest = beginFileHash()
     setFileError(undefined)
     try {
       const buf = await file.arrayBuffer()
       const result = {} as Record<HashAlgo, string>
       for (const algo of HASH_ALGOS) result[algo] = hashArrayBuffer(buf, algo)
+      if (!isLatest()) return
       setFileHash(result)
       setFileName(file.name)
     } catch (reason) {
-      setFileError(`文件读取失败: ${(reason as Error).message}`)
+      if (isLatest()) setFileError(`文件读取失败: ${(reason as Error).message}`)
     }
   }
 
   const useTextInput = (text: string) => {
+    cancelFileHash()
     setInput(text)
     setFileHash(null)
     setFileName('')
@@ -64,7 +69,7 @@ export function HashTool() {
           选择文件
         </FileDropInput>
         {fileName && <span className="text-xs text-slate-500">文件：{fileName}</span>}
-        <Button className="ml-auto" variant="danger" onClick={() => { setInput(''); setFileHash(null); setFileName(''); setFileError(undefined) }}>清空</Button>
+        <Button className="ml-auto" variant="danger" onClick={() => { cancelFileHash(); setInput(''); setFileHash(null); setFileName(''); setFileError(undefined) }}>清空</Button>
       </div>
       <ErrorHint message={fileError} />
       <Panel title="哈希结果" className="flex-none">

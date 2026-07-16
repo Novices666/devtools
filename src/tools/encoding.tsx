@@ -52,6 +52,8 @@ import {
 import { describeTimestamp } from '../core/time'
 import { useEffect } from 'react'
 import { HistoryMenu } from '../components/HistoryMenu'
+import { useLatestOperation } from '../hooks/useLatestOperation'
+import { inferImageMime } from '../core/files'
 
 function runSafe(fn: () => string): { out: string; error?: string } {
   try {
@@ -69,6 +71,7 @@ export function Base64Tool() {
   const [characterEncoding, setCharacterEncoding] = useState<CharacterEncoding>('utf-8')
   const [imgData, setImgData] = useState('')
   const [imageError, setImageError] = useState<string>()
+  const { begin: beginImageRead, cancel: cancelImageRead } = useLatestOperation()
   const { committed, commit, manual, dirty } = useProcessMode(input)
   const { out, error } = useMemo(() => {
     if (committed === '') return { out: '' }
@@ -95,13 +98,16 @@ export function Base64Tool() {
     : 'png'
 
   async function onImageFile(file: File) {
+    const isLatest = beginImageRead()
     setImageError(undefined)
     try {
       const bytes = new Uint8Array(await file.arrayBuffer())
-      const mime = file.type || detectImageMime(bytes)
+      if (!isLatest()) return
+      const mime = detectImageMime(bytes) || inferImageMime(file)
       if (!mime?.startsWith('image/')) throw new Error('无法识别图片格式')
       setImgData(`data:${mime};base64,${bytesToBase64(bytes)}`)
     } catch (reason) {
+      if (!isLatest()) return
       setImgData('')
       setImageError(`图片读取失败: ${(reason as Error).message}`)
     }
@@ -123,6 +129,7 @@ export function Base64Tool() {
           <Select
             value={base}
             onChange={(value) => {
+              cancelImageRead()
               setBase(value)
               setImgData('')
               setImageError(undefined)
@@ -143,14 +150,17 @@ export function Base64Tool() {
           <FileDropInput
             accept="image/*"
             onFile={onImageFile}
-            onReject={() => setImageError('请选择图片文件')}
+            onReject={() => {
+              cancelImageRead()
+              setImageError('请选择图片文件')
+            }}
             title="点击或拖入图片"
             className="cursor-pointer rounded-md bg-slate-200/70 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-300/70 dark:bg-slate-700/60 dark:text-slate-200 dark:hover:bg-slate-600/60"
           >
             图片转 Base64
           </FileDropInput>
         )}
-        <Button className="ml-auto" variant="danger" onClick={() => { setInput(''); setImgData(''); setImageError(undefined) }}>
+        <Button className="ml-auto" variant="danger" onClick={() => { cancelImageRead(); setInput(''); setImgData(''); setImageError(undefined) }}>
           清空
         </Button>
       </div>

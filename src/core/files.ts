@@ -1,3 +1,23 @@
+const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
+  avif: 'image/avif',
+  bmp: 'image/bmp',
+  gif: 'image/gif',
+  ico: 'image/x-icon',
+  jpeg: 'image/jpeg',
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+}
+
+/** 优先使用图片 MIME，缺失时根据共享支持的文件扩展名推断。 */
+export function inferImageMime(file: Pick<File, 'name' | 'type'>): string | null {
+  const declaredType = file.type.toLowerCase()
+  if (declaredType.startsWith('image/')) return declaredType
+  const extension = file.name.toLowerCase().match(/\.([^.]+)$/)?.[1]
+  return extension ? IMAGE_MIME_BY_EXTENSION[extension] ?? null : null
+}
+
 /** 根据 BOM 或严格 UTF-8 规则解码文本文件字节。 */
 export function decodeTextFileBytes(bytes: Uint8Array): string {
   try {

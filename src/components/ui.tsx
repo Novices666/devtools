@@ -9,7 +9,8 @@ import {
 } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlay } from '@fortawesome/free-solid-svg-icons'
-import { readTextFile } from '../core/files'
+import { inferImageMime, readTextFile } from '../core/files'
+import { useLatestOperation } from '../hooks/useLatestOperation'
 
 // ---------- 复制按钮 ----------
 export function CopyButton({ text, label = '复制', className = '' }: { text: string; label?: string; className?: string }) {
@@ -96,6 +97,7 @@ interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 export function TextArea({ onFileText, mono = true, className = '', onChange, ...rest }: TextAreaProps) {
   const [dragging, setDragging] = useState(false)
   const [fileError, setFileError] = useState<string>()
+  const { begin: beginFileRead, cancel: cancelFileRead } = useLatestOperation()
   const isFileDrag = (event: DragEvent<HTMLTextAreaElement>) =>
     Array.from(event.dataTransfer.types).includes('Files')
   const onDrop = useCallback(
@@ -105,15 +107,17 @@ export function TextArea({ onFileText, mono = true, className = '', onChange, ..
       setDragging(false)
       const file = e.dataTransfer.files[0]
       if (file && onFileText) {
+        const isLatest = beginFileRead()
         setFileError(undefined)
         try {
-          onFileText(await readTextFile(file), file)
+          const text = await readTextFile(file)
+          if (isLatest()) onFileText(text, file)
         } catch (reason) {
-          setFileError((reason as Error).message)
+          if (isLatest()) setFileError((reason as Error).message)
         }
       }
     },
-    [onFileText],
+    [beginFileRead, onFileText],
   )
   return (
     <>
@@ -121,6 +125,7 @@ export function TextArea({ onFileText, mono = true, className = '', onChange, ..
         {...rest}
         spellCheck={false}
         onChange={(event) => {
+          cancelFileRead()
           setFileError(undefined)
           onChange?.(event)
         }}
@@ -164,7 +169,7 @@ function matchesAccept(file: File, accept?: string): boolean {
     if (rule.startsWith('.')) return name.endsWith(rule)
     if (rule.endsWith('/*')) {
       if (file.type.toLowerCase().startsWith(rule.slice(0, -1))) return true
-      return rule === 'image/*' && /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(name)
+      return rule === 'image/*' && inferImageMime(file) !== null
     }
     return file.type.toLowerCase() === rule
   })

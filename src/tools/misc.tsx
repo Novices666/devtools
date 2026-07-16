@@ -28,6 +28,8 @@ import {
 } from '../core/mock'
 import { calcSubnet, parseUserAgent } from '../core/network'
 import { HistoryMenu } from '../components/HistoryMenu'
+import { inferImageMime } from '../core/files'
+import { useLatestOperation } from '../hooks/useLatestOperation'
 
 // ---------------- Markdown 预览 ----------------
 const MD_SAMPLE = `# 标题
@@ -111,27 +113,31 @@ export function ImageTool() {
   const [keepRatio, setKeepRatio] = useState(true)
   const [error, setError] = useState<string>()
   const imgRef = useRef<HTMLImageElement | null>(null)
+  const processSettingsRef = useRef({ format, quality, maxWidth, keepRatio })
+  processSettingsRef.current = { format, quality, maxWidth, keepRatio }
+  const { begin: beginImageRead, cancel: cancelImageRead } = useLatestOperation()
 
   const process = (img: HTMLImageElement) => {
     try {
+      const current = processSettingsRef.current
       const canvas = document.createElement('canvas')
       let w = img.naturalWidth
       let h = img.naturalHeight
-      const mw = Number(maxWidth)
+      const mw = Number(current.maxWidth)
       if (mw > 0 && w > mw) {
-        if (keepRatio) h = Math.round((h * mw) / w)
+        if (current.keepRatio) h = Math.round((h * mw) / w)
         w = mw
       }
       canvas.width = w
       canvas.height = h
       const ctx = canvas.getContext('2d')!
-      if (format === 'image/jpeg') {
+      if (current.format === 'image/jpeg') {
         ctx.fillStyle = '#ffffff' // JPEG 无透明通道，铺白底
         ctx.fillRect(0, 0, w, h)
       }
       ctx.drawImage(img, 0, 0, w, h)
-      const q = format === 'image/png' ? undefined : quality / 100
-      const url = canvas.toDataURL(format, q)
+      const q = current.format === 'image/png' ? undefined : current.quality / 100
+      const url = canvas.toDataURL(current.format, q)
       const size = Math.round((url.length - url.indexOf(',') - 1) * 0.75)
       setResult({ url, size, width: w, height: h })
       setError(undefined)
@@ -141,26 +147,39 @@ export function ImageTool() {
   }
 
   const onFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setError('请选择图片文件')
-      return
-    }
+    const isLatest = beginImageRead()
     setError(undefined)
     const reader = new FileReader()
     reader.onload = () => {
+      if (!isLatest()) return
       const img = new Image()
       img.onload = () => {
+        if (!isLatest()) return
         imgRef.current = img
         setSrcName(file.name)
         setSrcInfo({ url: img.src, size: file.size, width: img.naturalWidth, height: img.naturalHeight })
         process(img)
       }
-      img.onerror = () => setError('图片解码失败')
-      img.src = String(reader.result)
+      img.onerror = () => {
+        if (isLatest()) setError('图片解码失败')
+      }
+      const mime = inferImageMime(file)
+      img.src = mime
+        ? String(reader.result).replace(/^data:[^;,]*/, `data:${mime}`)
+        : String(reader.result)
     }
-    reader.onerror = () => setError('图片读取失败')
-    reader.onabort = () => setError('图片读取已取消')
+    reader.onerror = () => {
+      if (isLatest()) setError('图片读取失败')
+    }
+    reader.onabort = () => {
+      if (isLatest()) setError('图片读取已取消')
+    }
     reader.readAsDataURL(file)
+  }
+
+  const rejectFile = () => {
+    cancelImageRead()
+    setError('请选择图片文件')
   }
 
   // 参数变化时重新处理
@@ -213,7 +232,7 @@ export function ImageTool() {
         <FileDropInput
           accept="image/*"
           onFile={onFile}
-          onReject={() => setError('请选择图片文件')}
+          onReject={rejectFile}
           className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-300 p-12 text-sm text-slate-500 transition-colors hover:border-sky-400 dark:border-slate-600"
         >
           <span className="text-3xl text-slate-400"><FontAwesomeIcon icon={faImage} /></span>
@@ -229,7 +248,7 @@ export function ImageTool() {
                 <FileDropInput
                   accept="image/*"
                   onFile={onFile}
-                  onReject={() => setError('请选择图片文件')}
+                  onReject={rejectFile}
                   title="点击或拖入图片进行更换"
                   className="cursor-pointer text-xs text-sky-600 hover:underline dark:text-sky-400"
                 >
@@ -240,7 +259,7 @@ export function ImageTool() {
               <FileDropInput
                 accept="image/*"
                 onFile={onFile}
-                onReject={() => setError('请选择图片文件')}
+                onReject={rejectFile}
                 title="点击或拖入图片进行更换"
                 className="flex min-h-0 flex-1 cursor-pointer items-center justify-center overflow-auto rounded-md border border-transparent bg-slate-100 p-2 transition-colors dark:bg-slate-900/50"
               >

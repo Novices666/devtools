@@ -38,6 +38,7 @@ describe('工具组件冒烟测试', () => {
     )
     const zone = getByText('拖放图片').closest('label')!
     const image = new File(['png'], 'sample.png', { type: 'image/png' })
+    const extensionOnlyImage = new File(['png'], 'sample.png')
     const textFile = new File(['text'], 'sample.txt', { type: 'text/plain' })
 
     expect(
@@ -49,6 +50,11 @@ describe('工具组件冒烟测试', () => {
       dataTransfer: { types: ['Files'], files: [image], dropEffect: 'none' },
     })
     expect(onFile).toHaveBeenCalledWith(image)
+
+    fireEvent.drop(zone, {
+      dataTransfer: { types: ['Files'], files: [extensionOnlyImage], dropEffect: 'none' },
+    })
+    expect(onFile).toHaveBeenCalledWith(extensionOnlyImage)
 
     fireEvent.drop(zone, {
       dataTransfer: { types: ['Files'], files: [textFile], dropEffect: 'none' },
@@ -77,6 +83,31 @@ describe('工具组件冒烟测试', () => {
 
     await waitFor(() => expect(getByText(/文件编码无法识别/)).toBeTruthy())
     expect(onFileText).not.toHaveBeenCalled()
+  })
+
+  it('文本框连续拖入文件时只使用最后一次读取结果', async () => {
+    let resolveFirst!: (value: ArrayBuffer) => void
+    const firstRead = new Promise<ArrayBuffer>((resolve) => { resolveFirst = resolve })
+    const first = new File(['first'], 'first.txt', { type: 'text/plain' })
+    const second = new File(['second'], 'second.txt', { type: 'text/plain' })
+    Object.defineProperty(first, 'arrayBuffer', { value: vi.fn(() => firstRead) })
+    Object.defineProperty(second, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(new TextEncoder().encode('second').buffer),
+    })
+    const onFileText = vi.fn()
+    const { getByRole } = render(<TextArea onFileText={onFileText} />)
+    const textArea = getByRole('textbox')
+
+    fireEvent.drop(textArea, {
+      dataTransfer: { types: ['Files'], files: [first], dropEffect: 'none' },
+    })
+    fireEvent.drop(textArea, {
+      dataTransfer: { types: ['Files'], files: [second], dropEffect: 'none' },
+    })
+    await waitFor(() => expect(onFileText).toHaveBeenCalledWith('second', second))
+
+    await act(async () => resolveFirst(new TextEncoder().encode('first').buffer))
+    expect(onFileText).toHaveBeenCalledTimes(1)
   })
 
   it('Diff 工具将超限计算显示为错误提示', () => {
@@ -114,6 +145,32 @@ describe('工具组件冒烟测试', () => {
     })
     await waitFor(() => expect((getByRole('textbox') as HTMLTextAreaElement).value).toBe('text input'))
     expect(queryByText('文件：sample.bin')).toBeNull()
+  })
+
+  it('哈希工具连续拖入文件时保留最后一次结果', async () => {
+    let resolveFirst!: (value: ArrayBuffer) => void
+    const firstRead = new Promise<ArrayBuffer>((resolve) => { resolveFirst = resolve })
+    const first = new File(['first'], 'first.bin')
+    const second = new File(['second'], 'second.bin')
+    Object.defineProperty(first, 'arrayBuffer', { value: vi.fn(() => firstRead) })
+    Object.defineProperty(second, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(new TextEncoder().encode('second').buffer),
+    })
+    const HashTool = TOOLS.find((tool) => tool.id === 'hash')!.component
+    const { getByText, queryByText } = render(<HashTool />)
+    const dropTarget = getByText('选择文件').closest('label')!
+
+    fireEvent.drop(dropTarget, {
+      dataTransfer: { types: ['Files'], files: [first], dropEffect: 'none' },
+    })
+    fireEvent.drop(dropTarget, {
+      dataTransfer: { types: ['Files'], files: [second], dropEffect: 'none' },
+    })
+    await waitFor(() => expect(getByText('文件：second.bin')).toBeTruthy())
+
+    await act(async () => resolveFirst(new TextEncoder().encode('first').buffer))
+    expect(queryByText('文件：first.bin')).toBeNull()
+    expect(getByText('文件：second.bin')).toBeTruthy()
   })
 
   it.each(TOOLS.map((t) => [t.id, t.name, t.component] as const))(
@@ -157,6 +214,33 @@ describe('工具组件冒烟测试', () => {
     expect(getByText('图片预览')).toBeTruthy()
     expect(getByText('image/gif')).toBeTruthy()
     expect(queryByText(/Base64 包含非法字符/)).toBeNull()
+  })
+
+  it('图片转 Base64 连续拖入时保留最后一次结果', async () => {
+    let resolveFirst!: (value: ArrayBuffer) => void
+    const firstRead = new Promise<ArrayBuffer>((resolve) => { resolveFirst = resolve })
+    const pngHeader = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+    const first = new File(['first'], 'first.png')
+    const second = new File(['second'], 'second.png')
+    Object.defineProperty(first, 'arrayBuffer', { value: vi.fn(() => firstRead) })
+    Object.defineProperty(second, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(Uint8Array.from([...pngHeader, 2]).buffer),
+    })
+    const BaseTool = TOOLS.find((tool) => tool.id === 'base64')!.component
+    const { getByText, getAllByRole } = render(<BaseTool />)
+    const dropTarget = getByText('图片转 Base64').closest('label')!
+
+    fireEvent.drop(dropTarget, {
+      dataTransfer: { types: ['Files'], files: [first], dropEffect: 'none' },
+    })
+    fireEvent.drop(dropTarget, {
+      dataTransfer: { types: ['Files'], files: [second], dropEffect: 'none' },
+    })
+    await waitFor(() => expect(getByText('图片 Data URI')).toBeTruthy())
+    const latestValue = (getAllByRole('textbox')[0] as HTMLTextAreaElement).value
+
+    await act(async () => resolveFirst(Uint8Array.from([...pngHeader, 1]).buffer))
+    expect((getAllByRole('textbox')[0] as HTMLTextAreaElement).value).toBe(latestValue)
   })
 
   it('URL 参数解析结果可复制为 JSON', async () => {
