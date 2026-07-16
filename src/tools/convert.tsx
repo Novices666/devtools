@@ -106,7 +106,7 @@ export function ColorTool() {
           onChange={(e) => setInput(e.target.value)}
           className="h-10 w-16 cursor-pointer rounded-md border border-slate-200 bg-transparent dark:border-slate-700"
         />
-        <TextInput value={input} onChange={setInput} placeholder="#RRGGBB / rgb() / hsl()" className="min-w-[220px] flex-1 font-mono" />
+        <TextInput value={input} onChange={setInput} acceptOpenedFile placeholder="#RRGGBB / rgb() / hsl()" className="min-w-[220px] flex-1 font-mono" />
       </div>
       <ErrorHint message={rgb ? undefined : input.trim() ? '无法解析该颜色值' : undefined} />
       {derived && rgb && (

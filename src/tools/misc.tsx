@@ -384,7 +384,7 @@ export function SubnetTool() {
 
   return (
     <ToolShell title="IP / 子网计算" description="输入 CIDR（如 192.168.1.10/24），计算网络/广播地址、掩码、可用主机数">
-      <TextInput value={input} onChange={setInput} placeholder="192.168.1.10/24" className="font-mono" />
+      <TextInput value={input} onChange={setInput} acceptOpenedFile placeholder="192.168.1.10/24" className="font-mono" />
       <ErrorHint message={!info.valid ? info.error : undefined} />
       {info.valid && (
         <Panel>
@@ -425,7 +425,7 @@ export function UserAgentTool() {
         <Button variant="danger" onClick={() => setInput('')}>清空</Button>
         <span className="ml-auto"><HistoryMenu toolId="user-agent" value={input} onRestore={setInput} /></span>
       </div>
-      <TextArea value={input} onChange={(e) => setInput(e.target.value)} placeholder="粘贴 User-Agent 字符串" className="max-h-28" />
+      <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(text) => setInput(text)} placeholder="粘贴 User-Agent 字符串" className="max-h-28" />
       {input.trim() && (
         <Panel>
           <div className="flex flex-col gap-2">

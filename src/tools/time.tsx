@@ -70,7 +70,7 @@ export function TimestampTool() {
         />
       </div>
       <div className="flex items-center gap-2">
-        <TextInput value={input} onChange={setInput} placeholder="输入时间戳（秒/毫秒）或日期字符串，如 2026-07-09 12:00:00" className="w-full flex-1 font-mono" />
+        <TextInput value={input} onChange={setInput} acceptOpenedFile placeholder="输入时间戳（秒/毫秒）或日期字符串，如 2026-07-09 12:00:00" className="w-full flex-1 font-mono" />
         <HistoryMenu toolId="timestamp" value={input} onRestore={setInput} />
       </div>
       <Panel title="解析结果">
@@ -113,7 +113,7 @@ export function CronTool() {
   return (
     <ToolShell title="Cron 表达式" description="解析标准 5 字段 Cron（分 时 日 月 周），预测执行时间">
       <div className="flex flex-wrap items-center gap-2">
-        <TextInput value={expr} onChange={setExpr} placeholder="分 时 日 月 周，如 0 8 * * 1-5" className="flex-1 font-mono" />
+        <TextInput value={expr} onChange={setExpr} acceptOpenedFile placeholder="分 时 日 月 周，如 0 8 * * 1-5" className="flex-1 font-mono" />
         <Select value={String(count)} onChange={(v) => setCount(Number(v))} options={[5, 10, 20, 50].map((n) => ({ label: `未来 ${n} 次`, value: String(n) }))} />
       </div>
       <div className="flex flex-wrap gap-1.5">

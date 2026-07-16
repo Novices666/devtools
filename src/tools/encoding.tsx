@@ -269,7 +269,7 @@ export function UrlTool() {
       {mode === 'parse' ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
           <Panel title="URL / Query String 输入" className="flex-none">
-            <TextArea value={input} onChange={(e) => setInput(e.target.value)} placeholder="粘贴 URL 或 query string，如 a=1&b=hello%20world" className="min-h-[80px]" />
+            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(text) => setInput(text)} placeholder="粘贴 URL 或 query string，如 a=1&b=hello%20world" className="min-h-[80px]" />
           </Panel>
           <Panel
             title="参数表格（可编辑）"
@@ -315,7 +315,7 @@ export function UrlTool() {
         <TwoPane
           left={
             <Panel title="输入" actions={<HistoryMenu toolId="url" value={input} onRestore={setInput} />}>
-              <TextArea value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入文本" />
+              <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(text) => setInput(text)} placeholder="输入文本" />
               <ErrorHint message={error} />
             </Panel>
           }
@@ -550,7 +550,7 @@ export function JwtTool() {
       <TwoPane
         left={
           <Panel title="JWT 输入">
-            <TextArea value={input} onChange={(e) => setInput(e.target.value)} placeholder="粘贴 JWT (xxx.yyy.zzz)" />
+            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(text) => setInput(text)} placeholder="粘贴 JWT (xxx.yyy.zzz)" />
             <ErrorHint message={parsed?.error} />
           </Panel>
         }

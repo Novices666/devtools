@@ -11,6 +11,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlay } from '@fortawesome/free-solid-svg-icons'
 import { inferImageMime, readTextFile } from '../core/files'
 import { useLatestOperation } from '../hooks/useLatestOperation'
+import { useOpenedFileInput } from './OpenFileInputProvider'
 
 // ---------- 复制按钮 ----------
 export function CopyButton({ text, label = '复制', className = '' }: { text: string; label?: string; className?: string }) {
@@ -98,6 +99,9 @@ export function TextArea({ onFileText, mono = true, className = '', onChange, ..
   const [dragging, setDragging] = useState(false)
   const [fileError, setFileError] = useState<string>()
   const { begin: beginFileRead, cancel: cancelFileRead } = useLatestOperation()
+  useOpenedFileInput(Boolean(onFileText), (file) => {
+    onFileText?.(file.content, new File([file.content], file.path.split(/[\\/]/).pop() || 'file.txt'))
+  })
   const isFileDrag = (event: DragEvent<HTMLTextAreaElement>) =>
     Array.from(event.dataTransfer.types).includes('Files')
   const onDrop = useCallback(
@@ -317,7 +321,22 @@ export function Checkbox({ checked, onChange, label }: { checked: boolean; onCha
 }
 
 // ---------- 单行输入 ----------
-export function TextInput({ value, onChange, placeholder, className = '', type = 'text' }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string; type?: string }) {
+export function TextInput({
+  value,
+  onChange,
+  placeholder,
+  className = '',
+  type = 'text',
+  acceptOpenedFile = false,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  className?: string
+  type?: string
+  acceptOpenedFile?: boolean
+}) {
+  useOpenedFileInput(acceptOpenedFile, (file) => onChange(file.content))
   return (
     <input
       type={type}

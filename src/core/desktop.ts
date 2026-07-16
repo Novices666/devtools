@@ -2,10 +2,12 @@
 //
 // 设计原则：
 // - 纯 Web 环境下所有导出均为安全 no-op，绝不因缺少 Tauri 运行时而报错。
-// - 通过 `window.__TAURI_INTERNALS__` 探测运行时，避免静态 import @tauri-apps/*
-//   造成 Web 构建强依赖（保持一套前端双端运行）。
+// - 通过 `window.__TAURI_INTERNALS__` 探测运行时，并按需加载 @tauri-apps API，
+//   保持 Web 环境不执行任何桌面调用。
 // - 桌面专属能力（文件关联打开、系统剪贴板监听、托盘）由 Rust 侧发事件，
 //   前端在此订阅并转成回调。
+
+import { detectContent } from './detect'
 
 /** 是否运行在 Tauri 桌面容器内 */
 export function isDesktop(): boolean {
@@ -17,35 +19,77 @@ export function platform(): 'desktop' | 'web' {
   return isDesktop() ? 'desktop' : 'web'
 }
 
-// Tauri 的事件 API 通过全局注入，运行时动态取用，避免 Web 端打包报错。
-interface TauriEventApi {
-  listen: (event: string, handler: (e: { payload: unknown }) => void) => Promise<() => void>
-  emit: (event: string, payload?: unknown) => Promise<void>
+export interface OpenFilePayload {
+  path: string
+  content: string
 }
 
-function eventApi(): TauriEventApi | null {
-  if (!isDesktop()) return null
-  // @ts-expect-error 运行时注入
-  const api = window.__TAURI__?.event
-  return api ?? null
+const FILE_EXTENSION_TO_TOOL: Record<string, string> = {
+  csv: 'csv',
+  diff: 'diff',
+  json: 'json',
+  markdown: 'markdown',
+  md: 'markdown',
+  sql: 'sql',
+  toml: 'toml',
+  xml: 'xml',
+  yaml: 'yaml',
+  yml: 'yaml',
+}
+
+const OPEN_FILE_TOOLS = new Set([
+  'base64',
+  'color',
+  'cron',
+  'hash',
+  'json',
+  'sql',
+  'subnet',
+  'timestamp',
+  'url',
+  'user-agent',
+  'xml',
+  'jwt',
+])
+
+/** 根据扩展名和内容选择可接收文件内容的工具。 */
+export function resolveOpenFileTool(path: string, content: string): string {
+  const extension = path.toLowerCase().match(/\.([^.\\/]+)$/)?.[1]
+  if (extension && FILE_EXTENSION_TO_TOOL[extension]) return FILE_EXTENSION_TO_TOOL[extension]
+  const detected = detectContent(content).find((result) => OPEN_FILE_TOOLS.has(result.toolId))
+  return detected?.toolId ?? 'text-transform'
 }
 
 /**
- * 订阅桌面端"打开文件"事件（双击 .json/.txt 等关联文件，或拖入窗口）。
+ * 订阅桌面端"打开文件"事件（双击关联文件或通过系统“打开方式”进入）。
  * Rust 侧以 `open-file` 事件发送 { path, content }。
+ * 订阅完成后读取冷启动期间暂存的文件，避免前端尚未加载时丢失事件。
  * 返回取消订阅函数；Web 端返回 no-op。
  */
-export function onOpenFile(handler: (payload: { path: string; content: string }) => void): () => void {
-  const api = eventApi()
-  if (!api) return () => {}
+export function onOpenFile(handler: (payload: OpenFilePayload) => void): () => void {
+  if (!isDesktop()) return () => {}
+  let cancelled = false
   let dispose: (() => void) | null = null
-  api
-    .listen('open-file', (e) => handler(e.payload as { path: string; content: string }))
-    .then((d) => {
-      dispose = d
-    })
-    .catch(() => {})
-  return () => dispose?.()
+  void (async () => {
+    try {
+      const { listen } = await import('@tauri-apps/api/event')
+      const unlisten = await listen<OpenFilePayload>('open-file', (event) => handler(event.payload))
+      if (cancelled) {
+        unlisten()
+        return
+      }
+      dispose = unlisten
+      const { invoke } = await import('@tauri-apps/api/core')
+      const pending = await invoke<OpenFilePayload[]>('take_pending_open_files')
+      if (!cancelled) pending.forEach(handler)
+    } catch {
+      /* 桌面桥接初始化失败时保持 Web 功能可用 */
+    }
+  })()
+  return () => {
+    cancelled = true
+    dispose?.()
+  }
 }
 
 /**
@@ -53,14 +97,18 @@ export function onOpenFile(handler: (payload: { path: string; content: string })
  * Rust 侧以 `clipboard-changed` 事件发送剪贴板文本。
  */
 export function onClipboardChanged(handler: (text: string) => void): () => void {
-  const api = eventApi()
-  if (!api) return () => {}
+  if (!isDesktop()) return () => {}
+  let cancelled = false
   let dispose: (() => void) | null = null
-  api
-    .listen('clipboard-changed', (e) => handler(String(e.payload ?? '')))
-    .then((d) => {
-      dispose = d
+  void import('@tauri-apps/api/event')
+    .then(({ listen }) => listen<string>('clipboard-changed', (event) => handler(String(event.payload ?? ''))))
+    .then((unlisten) => {
+      if (cancelled) unlisten()
+      else dispose = unlisten
     })
     .catch(() => {})
-  return () => dispose?.()
+  return () => {
+    cancelled = true
+    dispose?.()
+  }
 }

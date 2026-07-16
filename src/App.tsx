@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback, type DragEvent } from 'react'
 import {
   TOOLS,
   TOOL_MAP,
@@ -12,7 +12,13 @@ import { useLocalStorage } from './hooks/useLocalStorage'
 import { useSettings } from './hooks/useSettings'
 import { SettingsPanel } from './components/SettingsPanel'
 import { detectContent } from './core/detect'
-import { isDesktop, onOpenFile, onClipboardChanged } from './core/desktop'
+import { isDesktop, onOpenFile, onClipboardChanged, resolveOpenFileTool } from './core/desktop'
+import { readTextFile } from './core/files'
+import { useLatestOperation } from './hooks/useLatestOperation'
+import {
+  OpenFileInputProvider,
+  type OpenedTextFile,
+} from './components/OpenFileInputProvider'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faToolbox,
@@ -60,8 +66,12 @@ export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [suggestion, setSuggestion] = useState<{ toolId: string; label: string } | null>(null)
+  const [openedFile, setOpenedFile] = useState<OpenedTextFile | null>(null)
+  const [openFileError, setOpenFileError] = useState<string>()
   const searchRef = useRef<HTMLInputElement>(null)
+  const openedFileIdRef = useRef(0)
   const [settings] = useSettings()
+  const { begin: beginWindowFileRead, cancel: cancelWindowFileRead } = useLatestOperation()
 
   const current = TOOL_MAP[currentId] ?? TOOLS[0]
 
@@ -81,6 +91,35 @@ export function App() {
       setQuery('')
     },
     [setCurrentId],
+  )
+
+  const openTextFile = useCallback(
+    (path: string, content: string) => {
+      const toolId = resolveOpenFileTool(path, content)
+      setOpenedFile({ id: ++openedFileIdRef.current, toolId, path, content })
+      setOpenFileError(undefined)
+      setCurrentId(toolId)
+      setQuery('')
+    },
+    [setCurrentId],
+  )
+
+  const handleWindowDrop = useCallback(
+    async (event: DragEvent<HTMLDivElement>) => {
+      if (event.defaultPrevented || !Array.from(event.dataTransfer.types).includes('Files')) return
+      event.preventDefault()
+      const file = event.dataTransfer.files[0]
+      if (!file) return
+      const isLatest = beginWindowFileRead()
+      setOpenFileError(undefined)
+      try {
+        const content = await readTextFile(file)
+        if (isLatest()) openTextFile(file.name, content)
+      } catch (reason) {
+        if (isLatest()) setOpenFileError((reason as Error).message)
+      }
+    },
+    [beginWindowFileRead, openTextFile],
   )
 
   // 剪贴板智能识别：读取剪贴板并推荐匹配工具
@@ -109,10 +148,9 @@ export function App() {
   // Web 环境下 onXxx 均为 no-op，不产生副作用。
   useEffect(() => {
     // 文件关联：双击 .json/.txt 等打开 → 按内容识别并跳转到对应工具，回填输入
-    const offOpen = onOpenFile(({ content }) => {
-      const hits = detectContent(content)
-      const toolId = hits[0]?.toolId && TOOL_MAP[hits[0].toolId] ? hits[0].toolId : 'json'
-      setCurrentId(toolId)
+    const offOpen = onOpenFile(({ path, content }) => {
+      cancelWindowFileRead()
+      openTextFile(path, content)
     })
     // 系统剪贴板监听：仅在设置开启时推荐
     const offClip = onClipboardChanged((text) => {
@@ -127,13 +165,21 @@ export function App() {
       offOpen()
       offClip()
     }
-  }, [setCurrentId, settings.clipboardDetect])
+  }, [cancelWindowFileRead, openTextFile, settings.clipboardDetect])
 
   const favTools = favorites.map((id) => TOOL_MAP[id]).filter(Boolean)
   const ToolComponent = current.component
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100">
+    <div
+      className="flex h-screen overflow-hidden bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100"
+      onDragOver={(event) => {
+        if (event.defaultPrevented || !Array.from(event.dataTransfer.types).includes('Files')) return
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'copy'
+      }}
+      onDrop={handleWindowDrop}
+    >
       {/* 侧边栏 */}
       <aside
         className={`flex shrink-0 flex-col border-r border-slate-200 bg-white transition-all dark:border-slate-700 dark:bg-slate-800/40 ${
@@ -301,8 +347,23 @@ export function App() {
             </button>
           </div>
         )}
+        {openFileError && (
+          <div className="flex items-center border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
+            <span>文件打开失败：{openFileError}</span>
+            <button
+              type="button"
+              onClick={() => setOpenFileError(undefined)}
+              title="关闭"
+              className="ml-auto text-red-400 hover:text-red-600"
+            >
+              <FontAwesomeIcon icon={faXmark} />
+            </button>
+          </div>
+        )}
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
-          <ToolComponent key={current.id} />
+          <OpenFileInputProvider file={openedFile?.toolId === current.id ? openedFile : null}>
+            <ToolComponent key={current.id} />
+          </OpenFileInputProvider>
         </main>
       </div>
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
