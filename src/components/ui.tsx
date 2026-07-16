@@ -12,6 +12,7 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlay } from '@fortawesome/free-solid-svg-icons'
 import { inferImageMime, readTextFile } from '../core/files'
+import { copyText } from '../core/clipboard'
 import { useLatestOperation } from '../hooks/useLatestOperation'
 import { useOpenedFileInput } from './OpenFileInputProvider'
 
@@ -24,29 +25,13 @@ interface CopyButtonProps {
 }
 
 export function CopyButton({ text, label = '复制', size = 'sm', className = '' }: CopyButtonProps) {
-  const [copied, setCopied] = useState(false)
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'failed'>('idle')
   const sizeClass = size === 'md' ? 'px-3 py-1.5 text-sm' : 'px-2.5 py-1 text-xs'
   const onCopy = useCallback(async () => {
     if (!text) return
-    try {
-      await navigator.clipboard.writeText(text)
-    } catch {
-      // 回退方案
-      const ta = document.createElement('textarea')
-      ta.value = text
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      try {
-        document.execCommand('copy')
-      } catch {
-        /* ignore */
-      }
-      document.body.removeChild(ta)
-    }
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    const succeeded = await copyText(text)
+    setCopyStatus(succeeded ? 'success' : 'failed')
+    setTimeout(() => setCopyStatus('idle'), 1500)
   }, [text])
   return (
     <button
@@ -54,12 +39,14 @@ export function CopyButton({ text, label = '复制', size = 'sm', className = ''
       onClick={onCopy}
       disabled={!text}
       className={`inline-flex items-center gap-1 rounded-md font-medium transition-colors ${sizeClass} ${
-        copied
+        copyStatus === 'success'
           ? 'bg-green-500/15 text-green-600 dark:text-green-400'
+          : copyStatus === 'failed'
+            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
           : 'bg-slate-200/70 text-slate-600 hover:bg-slate-300/70 disabled:opacity-40 dark:bg-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-600/60'
       } ${className}`}
     >
-      {copied ? '✓ 已复制' : label}
+      {copyStatus === 'success' ? '✓ 已复制' : copyStatus === 'failed' ? '复制失败' : label}
     </button>
   )
 }

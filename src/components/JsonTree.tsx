@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react'
+import { copyText } from '../core/clipboard'
+import { appendJsonPath } from '../core/jsonPath'
 
 interface JsonTreeProps {
   data: unknown
@@ -26,7 +28,7 @@ interface TreeNodeProps {
 
 function TreeNode({ nodeKey, value, path, depth, filter, defaultOpen = false }: TreeNodeProps) {
   const [open, setOpen] = useState(depth < 2 || defaultOpen)
-  const [copied, setCopied] = useState(false)
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'failed'>('idle')
 
   const isArray = Array.isArray(value)
   const isObject = value !== null && typeof value === 'object' && !isArray
@@ -43,13 +45,9 @@ function TreeNode({ nodeKey, value, path, depth, filter, defaultOpen = false }: 
     filter !== '' && !isBranch && String(value).toLowerCase().includes(filter)
 
   const copyPath = async () => {
-    try {
-      await navigator.clipboard.writeText(path)
-    } catch {
-      /* ignore */
-    }
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1200)
+    const succeeded = await copyText(path)
+    setCopyStatus(succeeded ? 'success' : 'failed')
+    setTimeout(() => setCopyStatus('idle'), 1200)
   }
 
   const keyLabel =
@@ -72,7 +70,8 @@ function TreeNode({ nodeKey, value, path, depth, filter, defaultOpen = false }: 
         <span className={`${valueMatches ? 'rounded bg-yellow-300/60 dark:bg-yellow-500/30' : ''} ${valueColor(value)}`}>
           {renderScalar(value)}
         </span>
-        {copied && <span className="text-green-500">✓已复制路径</span>}
+        {copyStatus === 'success' && <span className="text-green-500">✓已复制路径</span>}
+        {copyStatus === 'failed' && <span className="text-amber-600 dark:text-amber-300">复制失败</span>}
       </div>
     )
   }
@@ -102,7 +101,7 @@ function TreeNode({ nodeKey, value, path, depth, filter, defaultOpen = false }: 
           className="ml-1 rounded px-1 text-[10px] text-slate-400 opacity-0 transition-opacity hover:text-sky-500 group-hover:opacity-100"
           title={`复制路径：${path}`}
         >
-          {copied ? '✓' : '⧉ 路径'}
+          {copyStatus === 'success' ? '✓' : copyStatus === 'failed' ? '失败' : '⧉ 路径'}
         </button>
       </div>
       {open && (
@@ -112,7 +111,7 @@ function TreeNode({ nodeKey, value, path, depth, filter, defaultOpen = false }: 
               key={k}
               nodeKey={k}
               value={v}
-              path={isArray ? `${path}[${k}]` : `${path}.${k}`}
+              path={isArray ? `${path}[${k}]` : appendJsonPath(path, String(k))}
               depth={depth + 1}
               filter={filter}
             />
