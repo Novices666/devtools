@@ -198,6 +198,19 @@ describe('工具组件冒烟测试', () => {
     expect(ids.size).toBe(TOOLS.length) // id 无重复
   })
 
+  it('ID 生成页的主要操作按钮尺寸一致', async () => {
+    const IdTool = TOOLS.find((tool) => tool.id === 'id')!.component
+    const { getByRole } = await renderTool(IdTool)
+    const generateButton = getByRole('button', { name: '生成' })
+    const copyAllButton = getByRole('button', { name: '复制全部' })
+    const sizeClasses = ['px-3', 'py-1.5', 'text-sm']
+
+    for (const className of sizeClasses) {
+      expect(generateButton.classList.contains(className)).toBe(true)
+      expect(copyAllButton.classList.contains(className)).toBe(true)
+    }
+  })
+
   it('Base 工具可切换制式与字符编码', async () => {
     const BaseTool = TOOLS.find((t) => t.id === 'base64')!.component
     const { getAllByRole } = await renderTool(BaseTool)

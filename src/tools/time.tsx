@@ -195,7 +195,7 @@ export function IdTool() {
           </label>
         )}
         <Button variant="primary" onClick={gen}>生成</Button>
-        <CopyButton text={ids.join('\n')} label="复制全部" />
+        <CopyButton text={ids.join('\n')} label="复制全部" size="md" />
       </div>
       <Panel title={`结果（${ids.length}）`} className="min-h-0 flex-1">
         <Output value={ids.join('\n')} />

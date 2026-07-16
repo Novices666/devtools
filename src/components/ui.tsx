@@ -16,8 +16,16 @@ import { useLatestOperation } from '../hooks/useLatestOperation'
 import { useOpenedFileInput } from './OpenFileInputProvider'
 
 // ---------- 复制按钮 ----------
-export function CopyButton({ text, label = '复制', className = '' }: { text: string; label?: string; className?: string }) {
+interface CopyButtonProps {
+  text: string
+  label?: string
+  size?: 'sm' | 'md'
+  className?: string
+}
+
+export function CopyButton({ text, label = '复制', size = 'sm', className = '' }: CopyButtonProps) {
   const [copied, setCopied] = useState(false)
+  const sizeClass = size === 'md' ? 'px-3 py-1.5 text-sm' : 'px-2.5 py-1 text-xs'
   const onCopy = useCallback(async () => {
     if (!text) return
     try {
@@ -45,7 +53,7 @@ export function CopyButton({ text, label = '复制', className = '' }: { text: s
       type="button"
       onClick={onCopy}
       disabled={!text}
-      className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+      className={`inline-flex items-center gap-1 rounded-md font-medium transition-colors ${sizeClass} ${
         copied
           ? 'bg-green-500/15 text-green-600 dark:text-green-400'
           : 'bg-slate-200/70 text-slate-600 hover:bg-slate-300/70 disabled:opacity-40 dark:bg-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-600/60'
