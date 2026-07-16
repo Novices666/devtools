@@ -52,27 +52,7 @@
         "languages": ["SimpChinese"],
         "installMode": "currentUser"
       }
-    },
-    "fileAssociations": [
-      {
-        "ext": ["json"],
-        "name": "JSON File",
-        "description": "JSON 文件",
-        "role": "Editor"
-      },
-      {
-        "ext": ["yaml", "yml"],
-        "name": "YAML File",
-        "description": "YAML 文件",
-        "role": "Editor"
-      },
-      {
-        "ext": ["toml"],
-        "name": "TOML File",
-        "description": "TOML 文件",
-        "role": "Editor"
-      }
-    ]
+    }
   },
   "plugins": {}
 }

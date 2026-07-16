@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback, type DragEvent } from 'react'
+import { useMemo, useRef, useState, useCallback, type DragEvent } from 'react'
 import {
   TOOLS,
   TOOL_MAP,
@@ -10,7 +10,7 @@ import {
 import { useTheme, type Theme } from './hooks/useTheme'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { SettingsPanel } from './components/SettingsPanel'
-import { isDesktop, onOpenFile, resolveOpenFileTool } from './core/desktop'
+import { isDesktop, resolveOpenFileTool } from './core/desktop'
 import { readTextFile } from './core/files'
 import { useLatestOperation } from './hooks/useLatestOperation'
 import {
@@ -66,7 +66,7 @@ export function App() {
   const [openFileError, setOpenFileError] = useState<string>()
   const searchRef = useRef<HTMLInputElement>(null)
   const openedFileIdRef = useRef(0)
-  const { begin: beginWindowFileRead, cancel: cancelWindowFileRead } = useLatestOperation()
+  const { begin: beginWindowFileRead } = useLatestOperation()
 
   const current = TOOL_MAP[currentId] ?? TOOLS[0]
 
@@ -116,16 +116,6 @@ export function App() {
     },
     [beginWindowFileRead, openTextFile],
   )
-
-  // 桌面端（Tauri）文件关联桥接；Web 环境下为 no-op。
-  useEffect(() => {
-    // 文件关联：双击 .json/.txt 等打开 → 按内容识别并跳转到对应工具，回填输入
-    const offOpen = onOpenFile(({ path, content }) => {
-      cancelWindowFileRead()
-      openTextFile(path, content)
-    })
-    return offOpen
-  }, [cancelWindowFileRead, openTextFile])
 
   const favTools = favorites.map((id) => TOOL_MAP[id]).filter(Boolean)
   const ToolComponent = current.component
