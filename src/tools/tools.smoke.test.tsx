@@ -211,6 +211,18 @@ describe('工具组件冒烟测试', () => {
     }
   })
 
+  it('ID 生成页会阻止非法 NanoID 长度', async () => {
+    const IdTool = TOOLS.find((tool) => tool.id === 'id')!.component
+    const { getAllByRole, getByRole, getByText } = await renderTool(IdTool)
+
+    fireEvent.change(getAllByRole('combobox')[0], { target: { value: 'nanoid' } })
+    fireEvent.change(getByRole('spinbutton'), { target: { value: '-1' } })
+    fireEvent.click(getByRole('button', { name: '生成' }))
+
+    expect(getByText('NanoID 长度必须是 4 到 64 之间的整数')).toBeTruthy()
+    expect((getAllByRole('textbox')[0] as HTMLTextAreaElement).value).toBe('')
+  })
+
   it('Base 工具可切换制式与字符编码', async () => {
     const BaseTool = TOOLS.find((t) => t.id === 'base64')!.component
     const { getAllByRole } = await renderTool(BaseTool)

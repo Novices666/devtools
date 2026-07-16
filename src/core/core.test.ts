@@ -463,6 +463,9 @@ describe('id', () => {
   it('ulid and nanoid batches', () => {
     expect(generateUlid(3)).toHaveLength(3)
     expect(generateNanoId(2, 10)[0]).toHaveLength(10)
+    expect(() => generateNanoId(1, 0)).toThrow('NanoID 长度必须是 4 到 64 之间的整数')
+    expect(() => generateNanoId(1, 100)).toThrow('NanoID 长度必须是 4 到 64 之间的整数')
+    expect(() => generateNanoId(1, 4.5)).toThrow('NanoID 长度必须是 4 到 64 之间的整数')
   })
   it('parses snowflake', () => {
     const parts = parseSnowflake('1541815603606036480')

@@ -17,7 +17,16 @@ import {
   localTimeZone,
 } from '../core/time'
 import { parseCron, nextExecutions } from '../core/cron'
-import { generateUuids, generateUlid, generateNanoId, parseSnowflake, type SnowflakeParts } from '../core/id'
+import {
+  generateUuids,
+  generateUlid,
+  generateNanoId,
+  isValidNanoIdSize,
+  NANO_ID_MAX_SIZE,
+  NANO_ID_MIN_SIZE,
+  parseSnowflake,
+  type SnowflakeParts,
+} from '../core/id'
 import { HistoryMenu } from '../components/HistoryMenu'
 
 // ---------- 时间戳 ----------
@@ -158,10 +167,15 @@ type IdKind = 'uuidv4' | 'uuidv1' | 'ulid' | 'nanoid'
 export function IdTool() {
   const [kind, setKind] = useState<IdKind>('uuidv4')
   const [count, setCount] = useState(5)
-  const [nanoSize, setNanoSize] = useState(21)
+  const [nanoSize, setNanoSize] = useState('21')
   const [ids, setIds] = useState<string[]>([])
+  const nanoSizeValue = Number(nanoSize)
+  const nanoSizeError = kind === 'nanoid' && !isValidNanoIdSize(nanoSizeValue)
+    ? `NanoID 长度必须是 ${NANO_ID_MIN_SIZE} 到 ${NANO_ID_MAX_SIZE} 之间的整数`
+    : undefined
 
   function gen() {
+    if (nanoSizeError) return
     switch (kind) {
       case 'uuidv4':
         setIds(generateUuids('v4', count))
@@ -173,7 +187,7 @@ export function IdTool() {
         setIds(generateUlid(count))
         break
       case 'nanoid':
-        setIds(generateNanoId(count, nanoSize))
+        setIds(generateNanoId(count, nanoSizeValue))
         break
     }
   }
@@ -191,12 +205,22 @@ export function IdTool() {
         {kind === 'nanoid' && (
           <label className="flex items-center gap-1 text-sm text-slate-500">
             长度
-            <input type="number" min={4} max={64} value={nanoSize} onChange={(e) => setNanoSize(Number(e.target.value))} className="w-16 rounded-md border border-slate-200 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-800" />
+            <input
+              type="number"
+              min={NANO_ID_MIN_SIZE}
+              max={NANO_ID_MAX_SIZE}
+              step={1}
+              value={nanoSize}
+              aria-invalid={Boolean(nanoSizeError)}
+              onChange={(e) => setNanoSize(e.target.value)}
+              className="w-16 rounded-md border border-slate-200 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-800"
+            />
           </label>
         )}
         <Button variant="primary" onClick={gen}>生成</Button>
         <CopyButton text={ids.join('\n')} label="复制全部" size="md" />
       </div>
+      <ErrorHint message={nanoSizeError} />
       <Panel title={`结果（${ids.length}）`} className="min-h-0 flex-1">
         <Output value={ids.join('\n')} />
       </Panel>

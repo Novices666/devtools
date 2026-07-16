@@ -2,6 +2,13 @@
 import { ulid } from 'ulid'
 import { nanoid, customAlphabet } from 'nanoid'
 
+export const NANO_ID_MIN_SIZE = 4
+export const NANO_ID_MAX_SIZE = 64
+
+export function isValidNanoIdSize(size: number): boolean {
+  return Number.isInteger(size) && size >= NANO_ID_MIN_SIZE && size <= NANO_ID_MAX_SIZE
+}
+
 /** UUID v4（使用 crypto.randomUUID，回退到手写实现） */
 export function uuidV4(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -55,6 +62,9 @@ export function generateUlid(count: number): string[] {
 }
 
 export function generateNanoId(count: number, size = 21, alphabet?: string): string[] {
+  if (!isValidNanoIdSize(size)) {
+    throw new RangeError(`NanoID 长度必须是 ${NANO_ID_MIN_SIZE} 到 ${NANO_ID_MAX_SIZE} 之间的整数`)
+  }
   const gen = alphabet ? customAlphabet(alphabet, size) : () => nanoid(size)
   return Array.from({ length: Math.max(1, count) }, () => gen())
 }
