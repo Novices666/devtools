@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ToolShell, TwoPane, Panel, TextArea, Output, CopyButton, Button, Segmented, ErrorHint, Checkbox, Select, TextInput, ProcessControls, ProcessingHint } from '../components/ui'
 import { JsonTree } from '../components/JsonTree'
 import { HistoryMenu } from '../components/HistoryMenu'
@@ -28,6 +28,12 @@ export function JsonTool() {
   const [treeFilter, setTreeFilter] = useState('')
   const { committed, commit, manual, dirty } = useProcessMode(input)
 
+  // 状态徽章与错误提示始终反映「当前输入」，避免手动模式下显示过期的合法/错误
+  const inputValidation = useMemo((): JsonValidateResult | null => {
+    if (!input.trim()) return null
+    return validateJson(input)
+  }, [input])
+
   // 大文本（5MB+ JSON）时，把校验/格式化/解析统一放到异步路径，避免每次按键
   // 同步阻塞主线程（需求 §6.1）；常规数据仍走同步快路径，零延迟。
   const { result, pending, large } = useAsyncProcess(
@@ -51,14 +57,29 @@ export function JsonTool() {
     [indent, mode, jsonPath],
   )
 
-  const validation = result?.validation ?? { valid: true }
   const output = result?.output ?? ''
-  // 树视图数据：格式化模式用整个文档，查询模式用查询结果
-  const treeData = view === 'tree' && validation.valid ? result?.parsed : undefined
+  // 树视图数据：基于已提交结果，与输出面板一致
+  const treeData = view === 'tree' && result?.validation?.valid ? result?.parsed : undefined
 
-  const errorMsg = !validation.valid
-    ? `第 ${validation.line ?? '?'} 行 第 ${validation.column ?? '?'} 列：${validation.error}`
-    : undefined
+  const errorMsg =
+    inputValidation && !inputValidation.valid
+      ? `第 ${inputValidation.line ?? '?'} 行 第 ${inputValidation.column ?? '?'} 列：${inputValidation.error}`
+      : undefined
+
+  /** 更新输入；在手动模式下可选立即提交（示例/美化等明确意图的操作） */
+  const setInputAndMaybeCommit = (next: string, shouldCommit: boolean) => {
+    setInput(next)
+    if (shouldCommit) commit(next)
+  }
+
+  const applyTransform = (fn: (value: string) => string) => {
+    try {
+      const next = fn(input)
+      setInputAndMaybeCommit(next, true)
+    } catch {
+      /* 保持原输入 */
+    }
+  }
 
   return (
     <ToolShell title="JSON 工具" description="格式化、压缩、校验、排序键、JSONPath 查询、转义">
@@ -83,14 +104,14 @@ export function JsonTool() {
           />
         )}
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
-          <ProcessControls manual={manual} dirty={dirty} onRun={commit} />
-          <Button onClick={() => setInput(SAMPLE)}>示例</Button>
-          <Button onClick={() => setInput((v) => { try { return formatJson(v, indent) } catch { return v } })}>美化</Button>
-          <Button onClick={() => setInput((v) => { try { return minifyJson(v) } catch { return v } })}>压缩</Button>
-          <Button onClick={() => setInput((v) => { try { return sortJsonKeys(v, recursive, indent) } catch { return v } })}>排序键</Button>
-          <Button onClick={() => setInput((v) => { try { return escapeJsonString(v) } catch { return v } })}>转义</Button>
-          <Button onClick={() => setInput((v) => { try { return unescapeJsonString(v) } catch { return v } })}>反转义</Button>
-          <Button variant="danger" onClick={() => setInput('')}>清空</Button>
+          <ProcessControls manual={manual} dirty={dirty} onRun={() => commit()} />
+          <Button onClick={() => setInputAndMaybeCommit(SAMPLE, true)}>示例</Button>
+          <Button onClick={() => applyTransform((v) => formatJson(v, indent))}>美化</Button>
+          <Button onClick={() => applyTransform((v) => minifyJson(v))}>压缩</Button>
+          <Button onClick={() => applyTransform((v) => sortJsonKeys(v, recursive, indent))}>排序键</Button>
+          <Button onClick={() => applyTransform((v) => escapeJsonString(v))}>转义</Button>
+          <Button onClick={() => applyTransform((v) => unescapeJsonString(v))}>反转义</Button>
+          <Button variant="danger" onClick={() => setInputAndMaybeCommit('', true)}>清空</Button>
         </div>
       </div>
       {mode === 'query' && (
@@ -98,7 +119,7 @@ export function JsonTool() {
           <input
             value={jsonPath}
             onChange={(e) => setJsonPath(e.target.value)}
-            placeholder="JSONPath：$.a.b、$.tags[0]、$..key、$[*]、切片 $.a[1:3]、过滤 $.items[?(@.p>10)]"
+            placeholder="JSONPath（留空 = 根节点/整个 JSON）：$.a.b、$.tags[0]、$..key、$[*]、$.items[?(@.p>10)]"
             className="flex-1 rounded-md border border-slate-200 bg-white px-3 py-1.5 font-mono text-sm outline-none focus:border-sky-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
           />
         </div>
@@ -114,17 +135,35 @@ export function JsonTool() {
             title="输入"
             actions={
               <div className="flex items-center gap-2">
-                <span className={`text-xs ${validation.valid ? 'text-green-500' : 'text-red-500'}`}>
-                  {input.trim() ? (validation.valid ? '✓ 合法' : '✗ 错误') : ''}
+                <span
+                  className={`text-xs ${
+                    !inputValidation
+                      ? 'text-slate-400'
+                      : inputValidation.valid
+                        ? 'text-green-500'
+                        : 'text-red-500'
+                  }`}
+                >
+                  {!inputValidation
+                    ? ''
+                    : inputValidation.valid
+                      ? dirty
+                        ? '✓ 合法（未执行）'
+                        : '✓ 合法'
+                      : '✗ 错误'}
                 </span>
-                <HistoryMenu toolId="json" value={input} onRestore={setInput} />
+                <HistoryMenu
+                  toolId="json"
+                  value={input}
+                  onRestore={(v) => setInputAndMaybeCommit(v, true)}
+                />
               </div>
             }
           >
             <TextArea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onFileText={(t) => setInput(t)}
+              onFileText={(t) => setInputAndMaybeCommit(t, true)}
               placeholder="粘贴 JSON，或拖入 .json 文件"
             />
             <ErrorHint message={errorMsg} />
@@ -160,7 +199,7 @@ export function JsonTool() {
                 </div>
                 {treeData === undefined ? (
                   <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-slate-200 text-sm text-slate-400 dark:border-slate-700">
-                    {input.trim() ? '无法解析' : '暂无内容'}
+                    {committed.trim() ? '无法解析' : dirty ? '有未执行的输入' : '暂无内容'}
                   </div>
                 ) : (
                   <JsonTree data={treeData} filter={treeFilter} />

@@ -37,4 +37,14 @@ describe('settings store', () => {
       historyEnabled: false,
     })
   })
+
+  it('clears tool histories when history is disabled', () => {
+    localStorage.setItem(
+      'devtoolbox:history:json',
+      JSON.stringify([{ value: 'secret-data', at: Date.now() }]),
+    )
+    setSettings({ historyEnabled: true })
+    setSettings({ historyEnabled: false })
+    expect(localStorage.getItem('devtoolbox:history:json')).toBeNull()
+  })
 })

@@ -49,15 +49,15 @@ export function YamlTool() {
         />
         <div className="ml-auto flex items-center gap-1.5">
           <ProcessControls manual={manual} dirty={dirty} onRun={commit} />
-          <Button variant="danger" onClick={() => setInput('')}>
+          <Button variant="danger" onClick={() => { setInput(''); commit('') }}>
             清空
           </Button>
         </div>
       </div>
       <TwoPane
         left={
-          <Panel title="输入" actions={<HistoryMenu toolId="yaml" value={input} onRestore={setInput} />}>
-            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder={dir === 'j2y' ? '粘贴 JSON' : '粘贴 YAML'} />
+          <Panel title="输入" actions={<HistoryMenu toolId="yaml" value={input} onRestore={(v) => { setInput(v); commit(v) }} />}>
+            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => { setInput(t); commit(t) }} placeholder={dir === 'j2y' ? '粘贴 JSON' : '粘贴 YAML'} />
             <ErrorHint message={error} />
           </Panel>
         }
@@ -127,15 +127,15 @@ export function CsvTool() {
         <Checkbox checked={preview} onChange={setPreview} label="表格预览" />
         <div className="ml-auto flex items-center gap-1.5">
           <ProcessControls manual={manual} dirty={dirty} onRun={commit} />
-          <Button variant="danger" onClick={() => setInput('')}>
+          <Button variant="danger" onClick={() => { setInput(''); commit('') }}>
             清空
           </Button>
         </div>
       </div>
       <TwoPane
         left={
-          <Panel title="输入" actions={<HistoryMenu toolId="csv" value={input} onRestore={setInput} />}>
-            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder={mode === 'j2c' ? '粘贴 JSON 数组' : mode === 'md2c' ? '粘贴 Markdown 表格' : '粘贴 CSV'} />
+          <Panel title="输入" actions={<HistoryMenu toolId="csv" value={input} onRestore={(v) => { setInput(v); commit(v) }} />}>
+            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => { setInput(t); commit(t) }} placeholder={mode === 'j2c' ? '粘贴 JSON 数组' : mode === 'md2c' ? '粘贴 Markdown 表格' : '粘贴 CSV'} />
             <ErrorHint message={error} />
           </Panel>
         }
@@ -209,15 +209,15 @@ export function XmlTool() {
         )}
         <div className="ml-auto flex items-center gap-1.5">
           <ProcessControls manual={manual} dirty={dirty} onRun={commit} />
-          <Button variant="danger" onClick={() => setInput('')}>
+          <Button variant="danger" onClick={() => { setInput(''); commit('') }}>
             清空
           </Button>
         </div>
       </div>
       <TwoPane
         left={
-          <Panel title={jsonInput ? 'JSON 输入' : 'XML 输入'} actions={<HistoryMenu toolId="xml" value={input} onRestore={setInput} />}>
-            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder={jsonInput ? '粘贴 JSON' : '粘贴 XML'} />
+          <Panel title={jsonInput ? 'JSON 输入' : 'XML 输入'} actions={<HistoryMenu toolId="xml" value={input} onRestore={(v) => { setInput(v); commit(v) }} />}>
+            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => { setInput(t); commit(t) }} placeholder={jsonInput ? '粘贴 JSON' : '粘贴 XML'} />
             <ErrorHint message={error} />
           </Panel>
         }
@@ -267,18 +267,18 @@ export function TomlTool() {
             { label: 'JSON → TOML', value: 'j2t' },
           ]}
         />
-        <Button onClick={() => { setDir('t2j'); setInput(TOML_SAMPLE) }}>示例</Button>
+        <Button onClick={() => { setDir('t2j'); setInput(TOML_SAMPLE); commit(TOML_SAMPLE) }}>示例</Button>
         <div className="ml-auto flex items-center gap-1.5">
           <ProcessControls manual={manual} dirty={dirty} onRun={commit} />
-          <Button variant="danger" onClick={() => setInput('')}>
+          <Button variant="danger" onClick={() => { setInput(''); commit('') }}>
             清空
           </Button>
         </div>
       </div>
       <TwoPane
         left={
-          <Panel title={dir === 't2j' ? 'TOML 输入' : 'JSON 输入'} actions={<HistoryMenu toolId="toml" value={input} onRestore={setInput} />}>
-            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder={dir === 't2j' ? '粘贴 TOML' : '粘贴 JSON'} />
+          <Panel title={dir === 't2j' ? 'TOML 输入' : 'JSON 输入'} actions={<HistoryMenu toolId="toml" value={input} onRestore={(v) => { setInput(v); commit(v) }} />}>
+            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => { setInput(t); commit(t) }} placeholder={dir === 't2j' ? '粘贴 TOML' : '粘贴 JSON'} />
             <ErrorHint message={error} />
           </Panel>
         }
@@ -333,15 +333,15 @@ export function SqlTool() {
         )}
         <div className="ml-auto flex items-center gap-1.5">
           <ProcessControls manual={manual} dirty={dirty} onRun={commit} />
-          <Button variant="danger" onClick={() => setInput('')}>
+          <Button variant="danger" onClick={() => { setInput(''); commit('') }}>
             清空
           </Button>
         </div>
       </div>
       <TwoPane
         left={
-          <Panel title="输入" actions={<HistoryMenu toolId="sql" value={input} onRestore={setInput} />}>
-            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder="粘贴 SQL 语句" />
+          <Panel title="输入" actions={<HistoryMenu toolId="sql" value={input} onRestore={(v) => { setInput(v); commit(v) }} />}>
+            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => { setInput(t); commit(t) }} placeholder="粘贴 SQL 语句" />
             <ErrorHint message={error} />
           </Panel>
         }
@@ -386,15 +386,15 @@ export function JsonTypesTool() {
         </label>
         <div className="ml-auto flex items-center gap-1.5">
           <ProcessControls manual={manual} dirty={dirty} onRun={commit} />
-          <Button variant="danger" onClick={() => setInput('')}>
+          <Button variant="danger" onClick={() => { setInput(''); commit('') }}>
             清空
           </Button>
         </div>
       </div>
       <TwoPane
         left={
-          <Panel title="JSON 输入" actions={<HistoryMenu toolId="json-types" value={input} onRestore={setInput} />}>
-            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder="粘贴 JSON" />
+          <Panel title="JSON 输入" actions={<HistoryMenu toolId="json-types" value={input} onRestore={(v) => { setInput(v); commit(v) }} />}>
+            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => { setInput(t); commit(t) }} placeholder="粘贴 JSON" />
             <ErrorHint message={error} />
           </Panel>
         }

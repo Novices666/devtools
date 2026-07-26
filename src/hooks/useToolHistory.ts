@@ -35,6 +35,19 @@ export function useToolHistory(toolId: string, value: string) {
   )
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // 开关变化时同步内存态：关闭清空；重新开启从 localStorage 重载
+  useEffect(() => {
+    if (SENSITIVE_TOOLS.has(toolId)) {
+      setEntries([])
+      return
+    }
+    if (!settings.historyEnabled) {
+      setEntries([])
+      return
+    }
+    setEntries(load(toolId))
+  }, [toolId, settings.historyEnabled])
+
   // 去抖记录（停止输入 800ms 后写入一条）
   useEffect(() => {
     if (!enabled) return

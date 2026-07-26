@@ -292,8 +292,8 @@ describe('工具组件冒烟测试', () => {
     fireEvent.change(getByRole('textbox'), {
       target: { value: 'https://example.com/?tag=one&name=devtoolbox&tag=two' },
     })
-    fireEvent.click(getByRole('button', { name: '解析' }))
-    expect(copyJson.disabled).toBe(false)
+    // 参数解析随输入实时更新，无需单独点「解析」
+    await waitFor(() => expect(copyJson.disabled).toBe(false))
 
     await act(async () => fireEvent.click(copyJson))
     expect(writeText).toHaveBeenCalledWith(

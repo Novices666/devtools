@@ -53,6 +53,7 @@ import { describeTimestamp } from '../core/time'
 import { useEffect } from 'react'
 import { HistoryMenu } from '../components/HistoryMenu'
 import { useLatestOperation } from '../hooks/useLatestOperation'
+import { useOpenedBinaryFile } from '../components/OpenFileInputProvider'
 import { inferImageMime } from '../core/files'
 import { GeneratedFileButton } from '../components/GeneratedFileButton'
 
@@ -107,12 +108,18 @@ export function Base64Tool() {
       const mime = detectImageMime(bytes) || inferImageMime(file)
       if (!mime?.startsWith('image/')) throw new Error('无法识别图片格式')
       setImgData(`data:${mime};base64,${bytesToBase64(bytes)}`)
+      setBase('base64')
+      setMode('encode')
     } catch (reason) {
       if (!isLatest()) return
       setImgData('')
       setImageError(`图片读取失败: ${(reason as Error).message}`)
     }
   }
+
+  useOpenedBinaryFile(true, (file) => {
+    void onImageFile(file)
+  })
 
   return (
     <ToolShell title="Base 编解码" description="常用 Base 制式互转，可指定文本字符编码">
@@ -161,7 +168,7 @@ export function Base64Tool() {
             图片转 Base64
           </FileDropInput>
         )}
-        <Button className="ml-auto" variant="danger" onClick={() => { cancelImageRead(); setInput(''); setImgData(''); setImageError(undefined) }}>
+        <Button className="ml-auto" variant="danger" onClick={() => { cancelImageRead(); setInput(''); commit(''); setImgData(''); setImageError(undefined) }}>
           清空
         </Button>
       </div>
@@ -185,7 +192,7 @@ export function Base64Tool() {
         <TwoPane
           left={
             <Panel title={mode === 'encode' ? `文本输入 (${characterLabel})` : `${baseLabel} 输入`}>
-              <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder={mode === 'encode' ? '输入待编码文本' : `输入 ${baseLabel}`} />
+              <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => { setInput(t); commit(t) }} placeholder={mode === 'encode' ? '输入待编码文本' : `输入 ${baseLabel}`} />
               <ErrorHint message={decodedImage ? undefined : error} />
             </Panel>
           }
@@ -237,9 +244,12 @@ export function UrlTool() {
     return runSafe(() => (mode === 'encode' ? urlEncode(input, component) : urlDecode(input, component)))
   }, [input, mode, component])
 
-  function doParse() {
-    setParams(parseQueryString(input))
-  }
+  // 参数解析与编码/解码一致：输入变化即更新表格；表格仍可手工编辑
+  useEffect(() => {
+    if (mode !== 'parse') return
+    setParams(input.trim() ? parseQueryString(input) : [])
+  }, [input, mode])
+
   const rebuilt = useMemo(() => buildQueryString(params), [params])
   const paramsJson = useMemo(
     () => (params.some((param) => param.key !== '') ? queryParamsToJson(params) : ''),
@@ -263,12 +273,19 @@ export function UrlTool() {
             value={component ? 'comp' : 'uri'}
             onChange={(v) => setComponent(v === 'comp')}
             options={[
-              { label: 'Component', value: 'comp' },
-              { label: 'URI', value: 'uri' },
+              { label: '组件', value: 'comp' },
+              { label: '整段 URI', value: 'uri' },
             ]}
           />
         )}
-        {mode === 'parse' && <Button variant="primary" onClick={doParse}>解析</Button>}
+        {mode !== 'parse' && (
+          <span
+            className="text-xs text-slate-400"
+            title="组件：encodeURIComponent，会编码 & = ? 等；整段 URI：encodeURI，保留 URL 结构字符"
+          >
+            {component ? '编码查询参数/片段等组件' : '编码完整 URL（保留 :/?#&=）'}
+          </span>
+        )}
         <Button className="ml-auto" variant="danger" onClick={() => { setInput(''); setParams([]) }}>
           清空
         </Button>
@@ -365,7 +382,7 @@ export function UrlJsonTool() {
           ]}
         />
         <ProcessControls manual={manual} dirty={dirty} onRun={commit} />
-        <Button className="ml-auto" variant="danger" onClick={() => setInput('')}>
+        <Button className="ml-auto" variant="danger" onClick={() => { setInput(''); commit('') }}>
           清空
         </Button>
       </div>
@@ -373,12 +390,12 @@ export function UrlJsonTool() {
         left={
           <Panel
             title={queryToJson ? 'URL / Query String 输入' : 'JSON 输入'}
-            actions={<HistoryMenu toolId="url-json" value={input} onRestore={setInput} />}
+            actions={<HistoryMenu toolId="url-json" value={input} onRestore={(v) => { setInput(v); commit(v) }} />}
           >
             <TextArea
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              onFileText={(text) => setInput(text)}
+              onFileText={(text) => { setInput(text); commit(text) }}
               placeholder={
                 queryToJson
                   ? '输入完整 URL 或参数，如 ?page=1&tag=js&tag=ts'
@@ -416,7 +433,7 @@ export function HtmlEntityTool() {
         <Button className="ml-auto" variant="danger" onClick={() => setInput('')}>清空</Button>
       </div>
       <TwoPane
-        left={<Panel title="输入" actions={<HistoryMenu toolId="html-entity" value={input} onRestore={setInput} />}><TextArea value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入文本或 HTML" /></Panel>}
+        left={<Panel title="输入" actions={<HistoryMenu toolId="html-entity" value={input} onRestore={setInput} />}><TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder="输入文本或 HTML，可拖入文件" /></Panel>}
         right={<Panel title="输出" actions={<CopyButton text={out} />}><Output value={out} /></Panel>}
       />
     </ToolShell>
@@ -454,7 +471,7 @@ export function UnicodeTool() {
         <Button className="ml-auto" variant="danger" onClick={() => setInput('')}>清空</Button>
       </div>
       <TwoPane
-        left={<Panel title="输入" actions={<HistoryMenu toolId="unicode" value={input} onRestore={setInput} />}><TextArea value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入文本" /></Panel>}
+        left={<Panel title="输入" actions={<HistoryMenu toolId="unicode" value={input} onRestore={setInput} />}><TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder="输入文本，可拖入文件" /></Panel>}
         right={<Panel title="输出" actions={<CopyButton text={out} />}><Output value={out} /></Panel>}
       />
     </ToolShell>

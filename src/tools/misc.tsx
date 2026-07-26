@@ -29,6 +29,7 @@ import {
 } from '../core/mock'
 import { calcSubnet, parseUserAgent } from '../core/network'
 import { HistoryMenu } from '../components/HistoryMenu'
+import { useOpenedBinaryFile } from '../components/OpenFileInputProvider'
 import { inferImageMime } from '../core/files'
 import { useLatestOperation } from '../hooks/useLatestOperation'
 import { GeneratedFileButton } from '../components/GeneratedFileButton'
@@ -178,6 +179,9 @@ export function ImageTool() {
     }
     reader.readAsDataURL(file)
   }
+
+  // 窗口级拖入图片时注入
+  useOpenedBinaryFile(true, onFile)
 
   const rejectFile = () => {
     cancelImageRead()

@@ -20,6 +20,7 @@ import { aesEncrypt, aesDecrypt, generatePassword, generateToken, type AesMode, 
 import { generateRsaKeyPair, rsaEncrypt, rsaDecrypt } from '../core/rsa'
 import bcrypt from 'bcryptjs'
 import { useLatestOperation } from '../hooks/useLatestOperation'
+import { useOpenedBinaryFile } from '../components/OpenFileInputProvider'
 
 // ---------- 哈希 ----------
 export function HashTool() {
@@ -43,10 +44,15 @@ export function HashTool() {
       if (!isLatest()) return
       setFileHash(result)
       setFileName(file.name)
+      setInput('')
     } catch (reason) {
       if (isLatest()) setFileError(`文件读取失败: ${(reason as Error).message}`)
     }
   }
+
+  useOpenedBinaryFile(true, (file) => {
+    void onFile(file)
+  })
 
   const handleTextInput = (text: string) => {
     cancelFileHash()
@@ -98,12 +104,13 @@ export function HmacTool() {
   const [key, setKey] = useState('')
   const [algo, setAlgo] = useState<HashAlgo>('SHA256')
   const [output, setOutput] = useState<HmacOutput>('hex')
-  const out = useMemo(() => {
-    if (!input || !key) return ''
+  const { out, error } = useMemo(() => {
+    if (!input.trim()) return { out: '', error: undefined as string | undefined }
+    if (!key) return { out: '', error: '请输入密钥' }
     try {
-      return hmac(input, key, algo, output)
-    } catch {
-      return ''
+      return { out: hmac(input, key, algo, output), error: undefined }
+    } catch (e) {
+      return { out: '', error: (e as Error).message }
     }
   }, [input, key, algo, output])
   return (
@@ -115,7 +122,12 @@ export function HmacTool() {
       </div>
       <TextInput value={key} onChange={setKey} placeholder="密钥" className="w-full" />
       <TwoPane
-        left={<Panel title="输入"><TextArea value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入消息" /></Panel>}
+        left={
+          <Panel title="输入">
+            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder="输入消息，可拖入文件" />
+            <ErrorHint message={error} />
+          </Panel>
+        }
         right={<Panel title="HMAC 结果" actions={<CopyButton text={out} />}><Output value={out} /></Panel>}
       />
     </ToolShell>
@@ -132,15 +144,33 @@ export function AesTool() {
   const [keyFormat, setKeyFormat] = useState<KeyFormat>('Utf8')
   const [op, setOp] = useState<'encrypt' | 'decrypt'>('encrypt')
 
+  const needsIv = mode !== 'ECB'
+
+  const fillRandomIv = () => {
+    const bytes = new Uint8Array(16)
+    crypto.getRandomValues(bytes)
+    setIv(Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(''))
+  }
+
   const { out, error } = useMemo(() => {
-    if (!input || !key) return { out: '', error: undefined as string | undefined }
+    if (!input.trim()) return { out: '', error: undefined as string | undefined }
+    if (!key) return { out: '', error: '请输入密钥' }
+    if (needsIv && !iv.trim()) {
+      return {
+        out: '',
+        error: '当前模式需要 IV（Hex，16 字节 = 32 个十六进制字符）。可点击「随机 IV」自动填入。',
+      }
+    }
     try {
       const opts = { mode, padding, keyFormat, iv }
-      return { out: op === 'encrypt' ? aesEncrypt(input, key, opts) : aesDecrypt(input, key, opts), error: undefined }
+      return {
+        out: op === 'encrypt' ? aesEncrypt(input, key, opts) : aesDecrypt(input, key, opts),
+        error: undefined,
+      }
     } catch (e) {
       return { out: '', error: (e as Error).message }
     }
-  }, [input, key, iv, mode, padding, keyFormat, op])
+  }, [input, key, iv, mode, padding, keyFormat, op, needsIv])
 
   return (
     <ToolShell title="AES 加解密" description="可配置模式 / 填充 / 密钥格式 / IV">
@@ -149,11 +179,23 @@ export function AesTool() {
         <Select value={mode} onChange={setMode} options={(['CBC', 'ECB', 'CFB', 'OFB', 'CTR'] as AesMode[]).map((m) => ({ label: m, value: m }))} />
         <Select value={padding} onChange={setPadding} options={(['Pkcs7', 'NoPadding', 'ZeroPadding', 'Iso10126'] as AesPadding[]).map((p) => ({ label: p, value: p }))} />
         <Select value={keyFormat} onChange={setKeyFormat} options={(['Utf8', 'Hex', 'Base64'] as KeyFormat[]).map((k) => ({ label: '密钥:' + k, value: k }))} />
-        <Button className="ml-auto" variant="danger" onClick={() => setInput('')}>清空</Button>
+        <Button className="ml-auto" variant="danger" onClick={() => { setInput(''); setKey(''); setIv('') }}>清空</Button>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <TextInput value={key} onChange={setKey} placeholder="密钥 Key" className="flex-1" />
-        {mode !== 'ECB' && <TextInput value={iv} onChange={setIv} placeholder="IV（Hex，16 字节 = 32 hex 字符）" className="flex-1" />}
+      <div className="flex flex-wrap items-center gap-2">
+        <TextInput value={key} onChange={setKey} placeholder="密钥 Key" className="min-w-[12rem] flex-1" />
+        {needsIv && (
+          <>
+            <TextInput
+              value={iv}
+              onChange={setIv}
+              placeholder="IV（Hex，32 个十六进制字符）"
+              className="min-w-[12rem] flex-1 font-mono"
+            />
+            <Button type="button" onClick={fillRandomIv} title="填入 16 字节随机 IV（Hex）">
+              随机 IV
+            </Button>
+          </>
+        )}
       </div>
       <TwoPane
         left={

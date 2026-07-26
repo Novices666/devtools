@@ -1,4 +1,4 @@
-import { Suspense, useMemo, useRef, useState, useCallback, type DragEvent } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, useCallback, type DragEvent } from 'react'
 import {
   TOOLS,
   TOOL_MAP,
@@ -10,11 +10,13 @@ import {
 import { useTheme, type Theme } from './hooks/useTheme'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { SettingsPanel } from './components/SettingsPanel'
-import { isDesktop, resolveOpenFileTool } from './core/desktop'
+import { isDesktop, isImageFile, resolveImageOpenTool, resolveOpenFileTool } from './core/desktop'
 import { readTextFile } from './core/files'
 import { useLatestOperation } from './hooks/useLatestOperation'
 import {
   OpenFileInputProvider,
+  ToolPaneActiveProvider,
+  type OpenedBinaryFile,
   type OpenedTextFile,
 } from './components/OpenFileInputProvider'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -29,6 +31,10 @@ import {
   faDesktop,
 } from '@fortawesome/free-solid-svg-icons'
 import { faStar as faStarRegular } from '@fortawesome/free-regular-svg-icons'
+
+/** 非文本、非图片二进制的友好提示（避免暴露解码实现细节） */
+export const NON_TEXT_FILE_HINT =
+  '此文件不是文本。可在「哈希计算」中按原始字节处理，或在「图片工具」中处理图片。'
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme()
@@ -63,12 +69,20 @@ export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [openedFile, setOpenedFile] = useState<OpenedTextFile | null>(null)
+  const [openedBinary, setOpenedBinary] = useState<OpenedBinaryFile | null>(null)
   const [openFileError, setOpenFileError] = useState<string>()
+  // 本会话内访问过的工具保持挂载，切换时保留输入（刷新页面后清空）
+  const [visitedIds, setVisitedIds] = useState<string[]>(() => [currentId])
   const searchRef = useRef<HTMLInputElement>(null)
   const openedFileIdRef = useRef(0)
   const { begin: beginWindowFileRead } = useLatestOperation()
 
   const current = TOOL_MAP[currentId] ?? TOOLS[0]
+  const activeId = current.id
+
+  useEffect(() => {
+    setVisitedIds((prev) => (prev.includes(activeId) ? prev : [...prev, activeId]))
+  }, [activeId])
 
   const results = useMemo(() => searchTools(query), [query])
   const searching = query.trim() !== ''
@@ -91,12 +105,25 @@ export function App() {
   const openTextFile = useCallback(
     (path: string, content: string) => {
       const toolId = resolveOpenFileTool(path, content)
+      setOpenedBinary(null)
       setOpenedFile({ id: ++openedFileIdRef.current, toolId, path, content })
       setOpenFileError(undefined)
       setCurrentId(toolId)
       setQuery('')
     },
     [setCurrentId],
+  )
+
+  const openBinaryFile = useCallback(
+    (file: File, toolId?: string) => {
+      const target = toolId ?? resolveImageOpenTool(activeId)
+      setOpenedFile(null)
+      setOpenedBinary({ id: ++openedFileIdRef.current, toolId: target, file })
+      setOpenFileError(undefined)
+      setCurrentId(target)
+      setQuery('')
+    },
+    [activeId, setCurrentId],
   )
 
   const handleWindowDrop = useCallback(
@@ -107,18 +134,28 @@ export function App() {
       if (!file) return
       const isLatest = beginWindowFileRead()
       setOpenFileError(undefined)
+      // 图片：路由到可处理图片的工具
+      if (isImageFile(file)) {
+        if (isLatest()) openBinaryFile(file)
+        return
+      }
       try {
         const content = await readTextFile(file)
         if (isLatest()) openTextFile(file.name, content)
-      } catch (reason) {
-        if (isLatest()) setOpenFileError((reason as Error).message)
+      } catch {
+        if (!isLatest()) return
+        // 非文本二进制：在哈希工具则按原始字节处理，否则给出友好提示
+        if (activeId === 'hash') {
+          openBinaryFile(file, 'hash')
+        } else {
+          setOpenFileError(NON_TEXT_FILE_HINT)
+        }
       }
     },
-    [beginWindowFileRead, openTextFile],
+    [activeId, beginWindowFileRead, openBinaryFile, openTextFile],
   )
 
   const favTools = favorites.map((id) => TOOL_MAP[id]).filter(Boolean)
-  const ToolComponent = current.component
 
   return (
     <div
@@ -153,7 +190,7 @@ export function App() {
                 <NavItem
                   key={tool.id}
                   tool={tool}
-                  active={tool.id === currentId}
+                  active={tool.id === activeId}
                   favorite={favorites.includes(tool.id)}
                   onSelect={() => selectTool(tool.id)}
                   onToggleFav={() => toggleFavorite(tool.id)}
@@ -172,7 +209,7 @@ export function App() {
                       <NavItem
                         key={tool.id}
                         tool={tool}
-                        active={tool.id === currentId}
+                        active={tool.id === activeId}
                         favorite
                         onSelect={() => selectTool(tool.id)}
                         onToggleFav={() => toggleFavorite(tool.id)}
@@ -194,7 +231,7 @@ export function App() {
                         <NavItem
                           key={tool.id}
                           tool={tool}
-                          active={tool.id === currentId}
+                          active={tool.id === activeId}
                           favorite={favorites.includes(tool.id)}
                           onSelect={() => selectTool(tool.id)}
                           onToggleFav={() => toggleFavorite(tool.id)}
@@ -231,7 +268,15 @@ export function App() {
               ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索工具…"
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return
+                const first = searchTools(query)[0]
+                if (first) {
+                  e.preventDefault()
+                  selectTool(first.id)
+                }
+              }}
+              placeholder="搜索工具…（Enter 打开首个结果）"
               className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/50"
             />
             {query && (
@@ -276,19 +321,41 @@ export function App() {
           </div>
         )}
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
-          <OpenFileInputProvider file={openedFile?.toolId === current.id ? openedFile : null}>
-            <Suspense
-              fallback={
+          <OpenFileInputProvider
+            file={openedFile?.toolId === activeId ? openedFile : null}
+            binaryFile={openedBinary?.toolId === activeId ? openedBinary : null}
+          >
+            {/* 当前工具排在 DOM 前部，便于可见性查询与焦点顺序 */}
+            {[activeId, ...visitedIds.filter((id) => id !== activeId)].map((id) => {
+              const tool = TOOL_MAP[id]
+              if (!tool) return null
+              const ToolComponent = tool.component
+              const active = id === activeId
+              return (
                 <div
-                  role="status"
-                  className="flex min-h-24 items-center justify-center text-sm text-slate-400"
+                  key={id}
+                  className={active ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}
+                  aria-hidden={!active}
                 >
-                  正在加载工具…
+                  <ToolPaneActiveProvider active={active}>
+                    <Suspense
+                      fallback={
+                        active ? (
+                          <div
+                            role="status"
+                            className="flex min-h-24 items-center justify-center text-sm text-slate-400"
+                          >
+                            正在加载工具…
+                          </div>
+                        ) : null
+                      }
+                    >
+                      <ToolComponent />
+                    </Suspense>
+                  </ToolPaneActiveProvider>
                 </div>
-              }
-            >
-              <ToolComponent key={current.id} />
-            </Suspense>
+              )
+            })}
           </OpenFileInputProvider>
         </main>
       </div>

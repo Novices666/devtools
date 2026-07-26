@@ -28,6 +28,7 @@ import {
   type SnowflakeParts,
 } from '../core/id'
 import { HistoryMenu } from '../components/HistoryMenu'
+import { useToolPaneActive } from '../components/OpenFileInputProvider'
 
 // ---------- 时间戳 ----------
 export function TimestampTool() {
@@ -35,11 +36,15 @@ export function TimestampTool() {
   const [now, setNow] = useState(Date.now())
   const zones = useMemo(() => listSupportedTimeZones(), [])
   const [tz, setTz] = useState(() => localTimeZone())
+  const paneActive = useToolPaneActive()
 
+  // keep-alive 后台时暂停计时，避免隐藏工具持续 setState
   useEffect(() => {
+    if (!paneActive) return
+    setNow(Date.now())
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
-  }, [])
+  }, [paneActive])
 
   const parsed = useMemo(() => {
     if (!input.trim()) return null
@@ -244,7 +249,7 @@ export function SnowflakeTool() {
   return (
     <ToolShell title="雪花 ID 解析" description="拆解 Snowflake ID 的时间戳、数据中心、机器 ID、序列号">
       <div className="flex flex-wrap items-center gap-2">
-        <TextInput value={id} onChange={setId} placeholder="输入雪花 ID，如 1288834974657000000" className="flex-1 font-mono" />
+        <TextInput value={id} onChange={setId} acceptOpenedFile placeholder="输入雪花 ID，如 1288834974657000000" className="flex-1 font-mono" />
         <label className="flex items-center gap-1 text-sm text-slate-500">
           epoch
           <TextInput value={epoch} onChange={setEpoch} className="w-40 font-mono" />

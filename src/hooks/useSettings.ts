@@ -9,7 +9,7 @@ import { useCallback, useSyncExternalStore } from 'react'
 export type ProcessMode = 'auto' | 'manual'
 
 export interface Settings {
-  /** 处理模式：auto=输入即处理；manual=需点击"执行"或 Ctrl+Enter */
+  /** 处理模式：auto=输入即处理；manual=支持的工具需点击「执行」 */
   processMode: ProcessMode
   /** 是否记录工具输入历史 */
   historyEnabled: boolean
@@ -61,9 +61,29 @@ export function getSettings(): Settings {
   return current
 }
 
+const HISTORY_STORAGE_PREFIX = 'devtoolbox:history:'
+
+/** 关闭历史时清除所有工具历史落盘数据 */
+function clearAllToolHistories() {
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i)
+      if (key?.startsWith(HISTORY_STORAGE_PREFIX)) keys.push(key)
+    }
+    for (const key of keys) localStorage.removeItem(key)
+  } catch {
+    /* 忽略清理失败 */
+  }
+}
+
 /** 更新设置（部分字段合并） */
 export function setSettings(patch: Partial<Settings>): void {
+  const previous = current
   current = normalize({ ...current, ...patch })
+  if (previous.historyEnabled && !current.historyEnabled) {
+    clearAllToolHistories()
+  }
   persist()
   emit()
 }

@@ -21,8 +21,13 @@ describe('detectContent', () => {
     expect(top('#ff0000')).toBe('color')
     expect(top('rgb(1,2,3)')).toBe('color')
   })
-  it('detects uuid', () => {
-    expect(top('550e8400-e29b-41d4-a716-446655440000')).toBe('id')
+  it('does not map uuid or hex digest to generate/hash tools', () => {
+    expect(detectContent('550e8400-e29b-41d4-a716-446655440000').map((r) => r.toolId)).not.toContain(
+      'id',
+    )
+    expect(detectContent('d41d8cd98f00b204e9800998ecf8427e').map((r) => r.toolId)).not.toContain(
+      'hash',
+    )
   })
   it('detects cidr', () => {
     expect(top('192.168.1.0/24')).toBe('subnet')

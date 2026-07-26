@@ -66,7 +66,10 @@ export function DiffTool() {
   }, [left, right, mode])
 
   return (
-    <ToolShell title="文本 Diff 对比" description="行级 / 字符级 / JSON 结构化差异对比">
+    <ToolShell
+      title="文本对比"
+      description="行级 / 字符级 / JSON 结构化差异对比。窗口打开或拖入文件时默认填入左侧，请在右侧粘贴或拖入对比内容。"
+    >
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <Segmented
           value={mode}
@@ -225,7 +228,7 @@ export function RegexTool() {
   }, [input, pattern, result])
 
   return (
-    <ToolShell title="正则表达式测试" description="实时匹配高亮，展示分组捕获与常用速查">
+    <ToolShell title="正则测试" description="实时匹配高亮，展示分组捕获与常用速查">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-slate-400">/</span>
         <input
@@ -269,7 +272,7 @@ export function RegexTool() {
       <TwoPane
         left={
           <Panel title="测试文本" actions={<div className="flex items-center gap-2"><span className="text-xs text-slate-400">{result.matches.length} 处匹配</span><HistoryMenu toolId="regex" value={input} onRestore={setInput} /></div>}>
-            <TextArea value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入待匹配文本" />
+            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder="输入待匹配文本，可拖入文件" />
           </Panel>
         }
         right={

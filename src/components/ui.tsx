@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlay } from '@fortawesome/free-solid-svg-icons'
+import { isImageFile } from '../core/desktop'
 import { inferImageMime, readTextFile } from '../core/files'
 import { copyText } from '../core/clipboard'
 import { useLatestOperation } from '../hooks/useLatestOperation'
@@ -105,9 +106,15 @@ export function TextArea({ onFileText, mono = true, className = '', onChange, ..
     async (e: DragEvent<HTMLTextAreaElement>) => {
       if (!Array.from(e.dataTransfer.types).includes('Files')) return
       e.preventDefault()
+      // 阻止冒泡到窗口级拖放，避免同一文件被处理两次
+      e.stopPropagation()
       setDragging(false)
       const file = e.dataTransfer.files[0]
       if (file && onFileText) {
+        if (isImageFile(file)) {
+          setFileError('文本框不支持图片。请拖到窗口空白处，或使用「图片工具 / 二维码 / Base 编解码」。')
+          return
+        }
         const isLatest = beginFileRead()
         setFileError(undefined)
         try {
@@ -214,6 +221,7 @@ export function FileDropInput({
       onDrop={(event) => {
         if (!isFileDrag(event)) return
         event.preventDefault()
+        event.stopPropagation()
         setDragging(false)
         const file = event.dataTransfer.files[0]
         if (file) handleFile(file)

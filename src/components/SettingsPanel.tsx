@@ -54,7 +54,10 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             />
           </Row>
 
-          <Row label="处理模式" hint="自动：输入即处理；手动：点击执行">
+          <Row
+            label="处理模式"
+            hint="主要影响 JSON、格式转换、Base 等大文本工具。自动：输入即处理；手动：上述工具需点「执行」，其余仍实时。无快捷键。"
+          >
             <Segmented
               value={settings.processMode}
               onChange={(v) => update({ processMode: v })}
@@ -65,7 +68,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             />
           </Row>
 
-          <Row label="历史记录" hint="记录工具输入快照（敏感工具始终不记录）">
+          <Row label="历史记录" hint="记录工具输入快照（敏感工具始终不记录；关闭时清空已存历史）">
             <Toggle
               checked={settings.historyEnabled}
               onChange={(v) => update({ historyEnabled: v })}
@@ -74,7 +77,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
           </Row>
 
           <div className="rounded-lg bg-slate-100 p-3 text-xs leading-relaxed text-slate-500 dark:bg-slate-900/50">
-            所有设置与数据仅保存在本机（localStorage），不会上传服务器。离线优先，数据不出本机。
+            设置与允许记录的历史保存在本机 localStorage，不会上传服务器。切换工具时本会话会保留各工具输入；刷新页面后清空（不另做持久化）。
           </div>
         </div>
       </div>

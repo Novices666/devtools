@@ -49,15 +49,8 @@ export function detectContent(input: string): DetectionResult[] {
     add('color', '颜色值', 0.9)
   }
 
-  // 十六进制哈希（32/40/64 位）
-  if (/^[0-9a-f]{32}$/i.test(s) || /^[0-9a-f]{40}$/i.test(s) || /^[0-9a-f]{64}$/i.test(s)) {
-    add('hash', '哈希摘要', 0.55)
-  }
-
-  // UUID
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)) {
-    add('id', 'UUID', 0.9)
-  }
+  // 注意：不将纯十六进制/UUID 映射到哈希或 ID 生成工具——
+  // 哈希工具用于「计算」摘要，ID 工具用于「生成」标识，均非解析类能力。
 
   // CIDR / IP
   if (/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(s)) {
@@ -74,8 +67,14 @@ export function detectContent(input: string): DetectionResult[] {
     add('xml', 'XML 文档', 0.75)
   }
 
-  // Base64（较长、字符集匹配、长度为 4 的倍数或含 padding）
-  if (s.length >= 16 && /^[A-Za-z0-9+/]+={0,2}$/.test(s) && !looksLikeJson(s)) {
+  // Base64（较长、字符集匹配）。排除纯十六进制短串（常见哈希形态，避免误路由到 Base 工具）
+  const looksLikeHexDigest = /^(?:[0-9a-f]+|[0-9A-F]+)$/.test(s) && [32, 40, 64].includes(s.length)
+  if (
+    s.length >= 16 &&
+    /^[A-Za-z0-9+/]+={0,2}$/.test(s) &&
+    !looksLikeJson(s) &&
+    !looksLikeHexDigest
+  ) {
     add('base64', 'Base64 字符串', 0.5)
   }
 

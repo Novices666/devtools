@@ -24,6 +24,7 @@ import {
 import { inferImageMime } from '../core/files'
 import { GeneratedFileButton } from '../components/GeneratedFileButton'
 import { useLatestOperation } from '../hooks/useLatestOperation'
+import { useOpenedBinaryFile } from '../components/OpenFileInputProvider'
 
 // ---------------- 进制转换 ----------------
 export function RadixTool() {
@@ -238,6 +239,9 @@ export function QrCodeTool() {
     }
     reader.readAsDataURL(file)
   }
+
+  // 窗口拖入图片 → 识别二维码
+  useOpenedBinaryFile(true, onDecodeFile)
 
   return (
     <ToolShell title="二维码" description="文本 / URL 生成二维码（可下载），或上传图片解析">

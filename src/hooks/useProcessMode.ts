@@ -5,14 +5,16 @@ import { useSettings } from './useSettings'
  * 处理模式辅助 hook。
  *
  * 自动模式（默认）：committed 始终跟随 live，输入即处理。
- * 手动模式：committed 仅在调用 commit()（点击"执行"）时更新，
+ * 手动模式：committed 仅在调用 commit()（点击「执行」）时更新，
  *          期间 dirty=true 表示存在未处理的改动。
+ * 无键盘快捷键；执行仅通过 UI 按钮或显式 commit 调用。
  *
  * 工具将 committed 传入既有的 useMemo 计算即可，改动量极小。
  */
 export function useProcessMode(live: string): {
   committed: string
-  commit: () => void
+  /** 提交处理。可传入覆盖值（用于美化/示例等已算好下一帧输入的场景）。 */
+  commit: (value?: string) => void
   manual: boolean
   dirty: boolean
 } {
@@ -26,7 +28,10 @@ export function useProcessMode(live: string): {
   // 手动模式下使用最近一次 commit 的快照。
   const committed = manual ? manualCommitted : live
 
-  const commit = useCallback(() => setManualCommitted(liveRef.current), [])
+  const commit = useCallback((value?: string) => {
+    // 仅接受字符串覆盖；忽略按钮 onClick 传入的事件对象
+    setManualCommitted(typeof value === 'string' ? value : liveRef.current)
+  }, [])
 
   // 切换到手动模式的瞬间，用当前 live 作为快照，避免显示挂载时的旧值
   const prevManual = useRef(manual)
