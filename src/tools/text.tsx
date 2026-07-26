@@ -320,36 +320,82 @@ export function RegexTool() {
 }
 
 // ---------------- 文本转换（大小写 / 命名 / 行处理 / 统计） ----------------
+/** 大小写变换：只影响输出，不改写输入 */
+type CaseMode = 'as-is' | 'upper' | 'lower' | 'title' | 'sentence'
+
+function applyCase(text: string, mode: CaseMode): string {
+  switch (mode) {
+    case 'upper':
+      return toUpperCase(text)
+    case 'lower':
+      return toLowerCase(text)
+    case 'title':
+      return toTitleCase(text)
+    case 'sentence':
+      return toSentenceCase(text)
+    default:
+      return text
+  }
+}
+
 export function TextTransformTool() {
   const [input, setInput] = useState('')
   const [ops, setOps] = useState<LineOps>({ sort: 'none' })
+  const [caseMode, setCaseMode] = useState<CaseMode>('as-is')
 
   const stats = useMemo(() => textStats(input), [input])
   const naming = useMemo(() => (input.trim() ? convertNamingAll(input.trim().split(/\s+/)[0] || input) : null), [input])
-  const lineResult = useMemo(() => processLines(input, ops), [input, ops])
+  // 先大小写，再行处理；结果只出现在右侧输出
+  const output = useMemo(() => processLines(applyCase(input, caseMode), ops), [input, caseMode, ops])
 
   const setOp = <K extends keyof LineOps>(k: K, v: LineOps[K]) => setOps((p) => ({ ...p, [k]: v }))
 
+  const caseButtons: Array<{ label: string; value: CaseMode }> = [
+    { label: '原样', value: 'as-is' },
+    { label: '全大写', value: 'upper' },
+    { label: '全小写', value: 'lower' },
+    { label: '单词首字母大写', value: 'title' },
+    { label: '句首大写', value: 'sentence' },
+  ]
+
   return (
-    <ToolShell title="文本转换" description="大小写、命名风格、行去重/排序、字符统计">
-      <div className="flex flex-wrap gap-1.5">
-        <Button onClick={() => setInput(toUpperCase)}>全大写</Button>
-        <Button onClick={() => setInput(toLowerCase)}>全小写</Button>
-        <Button onClick={() => setInput(toTitleCase)}>单词首字母大写</Button>
-        <Button onClick={() => setInput(toSentenceCase)}>句首大写</Button>
-        <Button className="ml-auto" variant="danger" onClick={() => setInput('')}>清空</Button>
+    <ToolShell title="文本转换" description="大小写、命名风格、行去重/排序、字符统计（变换结果在输出区）">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {caseButtons.map((btn) => (
+          <Button
+            key={btn.value}
+            variant={caseMode === btn.value ? 'primary' : 'ghost'}
+            onClick={() => setCaseMode(btn.value)}
+          >
+            {btn.label}
+          </Button>
+        ))}
+        <Button className="ml-auto" variant="danger" onClick={() => setInput('')}>
+          清空
+        </Button>
       </div>
+      <p className="text-xs text-slate-400">大小写与行处理结果仅显示在右侧，不覆盖输入</p>
       <TwoPane
         left={
-          <Panel title="输入" actions={<div className="flex items-center gap-2"><HistoryMenu toolId="text-transform" value={input} onRestore={setInput} /><CopyButton text={input} /></div>}>
-            <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => setInput(t)} placeholder="输入文本" />
+          <Panel
+            title="输入"
+            actions={
+              <div className="flex items-center gap-2">
+                <HistoryMenu toolId="text-transform" value={input} onRestore={setInput} />
+                <CopyButton text={input} />
+              </div>
+            }
+          >
+            <TextArea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onFileText={(t) => setInput(t)}
+              placeholder="输入文本"
+            />
           </Panel>
         }
         right={
-          <Panel
-            title="行处理结果"
-            actions={<CopyButton text={lineResult} />}
-          >
+          <Panel title="输出" actions={<CopyButton text={output} />}>
             <div className="mb-2 flex flex-wrap items-center gap-3">
               <Checkbox checked={!!ops.trim} onChange={(v) => setOp('trim', v)} label="去首尾空格" />
               <Checkbox checked={!!ops.dedupe} onChange={(v) => setOp('dedupe', v)} label="去重" />
@@ -364,7 +410,7 @@ export function TextTransformTool() {
                 ]}
               />
             </div>
-            <Output value={lineResult} />
+            <Output value={output} />
           </Panel>
         }
       />
@@ -378,7 +424,10 @@ export function TextTransformTool() {
         <Panel title="命名风格转换（取首个单词/整体）">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {Object.entries(naming).map(([style, val]) => (
-              <div key={style} className="flex items-center justify-between gap-2 rounded-md bg-slate-100 px-3 py-1.5 dark:bg-slate-900/50">
+              <div
+                key={style}
+                className="flex items-center justify-between gap-2 rounded-md bg-slate-100 px-3 py-1.5 dark:bg-slate-900/50"
+              >
                 <span className="text-xs text-slate-400">{style}</span>
                 <span className="flex-1 truncate font-mono text-sm">{val}</span>
                 <CopyButton text={val} label="复制" />
