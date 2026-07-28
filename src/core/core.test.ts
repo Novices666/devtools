@@ -53,6 +53,7 @@ import {
   jsonDiffStats,
   toTitleCase,
 } from './text'
+import { convertChinese, resolveChineseLocales } from './chinese'
 import { convertRadix, parseColor, rgbToHsl, hslToRgb, rgbToHsv, rgbToHex, hexToRgb } from './convert'
 import {
   jsonToYaml,
@@ -544,6 +545,42 @@ describe('text', () => {
     const entries = diffJson('{"x":{"y":[1,2]}}', '{"x":{"y":[1,3]}}')
     const changed = entries.find((e) => e.type === 'changed')
     expect(changed?.path).toBe('$.x.y[1]')
+  })
+})
+
+// ---------------- chinese convert ----------------
+describe('chinese', () => {
+  it('resolves locales by direction and variant', () => {
+    expect(resolveChineseLocales('s2t', 'tw')).toEqual({ from: 'cn', to: 'tw' })
+    expect(resolveChineseLocales('t2s', 'hk')).toEqual({ from: 'hk', to: 'cn' })
+    expect(resolveChineseLocales('s2t', 'twp')).toEqual({ from: 'cn', to: 'twp' })
+  })
+
+  it('converts simplified to traditional', () => {
+    expect(convertChinese('汉字', 's2t', 'tw')).toBe('漢字')
+    expect(convertChinese('开放中文转换', 's2t', 'tw')).toBe('開放中文轉換')
+  })
+
+  it('converts traditional to simplified', () => {
+    expect(convertChinese('漢字', 't2s', 'tw')).toBe('汉字')
+    expect(convertChinese('開放中文轉換', 't2s', 'tw')).toBe('开放中文转换')
+  })
+
+  it('applies Taiwan phrase variants when requested', () => {
+    expect(convertChinese('软件', 's2t', 'tw')).toBe('軟件')
+    expect(convertChinese('软件', 's2t', 'twp')).toBe('軟體')
+    expect(convertChinese('信息', 's2t', 'twp')).toBe('資訊')
+  })
+
+  it('keeps non-Chinese text and empty input intact', () => {
+    expect(convertChinese('', 's2t')).toBe('')
+    expect(convertChinese('Hello 世界 123', 's2t', 'tw')).toBe('Hello 世界 123')
+    expect(convertChinese('Hello 世界 123', 't2s', 'tw')).toBe('Hello 世界 123')
+  })
+
+  it('supports Hong Kong traditional variants', () => {
+    // 里：大陆简体→港繁常为「裏」
+    expect(convertChinese('里面', 's2t', 'hk')).toBe('裏面')
   })
 })
 

@@ -2,7 +2,7 @@
 
 开发者工具箱 - 聚合式离线开发者工具集（Web + Windows 桌面端）
 
-DevToolbox 提供 Web/PWA 与 Windows 桌面端，当前内置 34 个常用开发工具。核心转换和计算均在浏览器或桌面 WebView 本地完成，不依赖后端服务上传输入数据。仓库沿用 `devtools` 名称，应用和 npm 包使用 `DevToolbox`/`devtoolbox` 名称。
+DevToolbox 提供 Web/PWA 与 Windows 桌面端，当前内置 35 个常用开发工具。核心转换和计算均在浏览器或桌面 WebView 本地完成，不依赖后端服务上传输入数据。仓库沿用 `devtools` 名称，应用和 npm 包使用 `DevToolbox`/`devtoolbox` 名称。
 
 ## 目录
 
@@ -145,6 +145,7 @@ Base 工具还支持图片与 Base64 Data URI 双向处理、图片预览和下�
 | 文本对比 | 行级、字符级和 JSON 结构化差异对比 |
 | 正则测试 | 实时匹配、高亮、捕获分组和常用正则预设 |
 | 文本转换 | 大小写、命名风格、行去重/排序和字符统计 |
+| 繁简转换 | 简体与繁体互转，支持台湾 / 香港字形及台湾惯用词 |
 
 ### 转换工具
 

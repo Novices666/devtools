@@ -14,6 +14,7 @@ const loadEncodingTools = () => import('./tools/encoding')
 const loadCryptoTools = () => import('./tools/crypto')
 const loadTimeTools = () => import('./tools/time')
 const loadTextTools = () => import('./tools/text')
+const loadChineseTools = () => import('./tools/chinese')
 const loadConvertTools = () => import('./tools/convert')
 const loadMiscTools = () => import('./tools/misc')
 
@@ -43,6 +44,7 @@ const SnowflakeTool = lazyTool(loadTimeTools, 'SnowflakeTool')
 const DiffTool = lazyTool(loadTextTools, 'DiffTool')
 const RegexTool = lazyTool(loadTextTools, 'RegexTool')
 const TextTransformTool = lazyTool(loadTextTools, 'TextTransformTool')
+const ChineseConvertTool = lazyTool(loadChineseTools, 'ChineseConvertTool')
 const RadixTool = lazyTool(loadConvertTools, 'RadixTool')
 const ColorTool = lazyTool(loadConvertTools, 'ColorTool')
 const QrCodeTool = lazyTool(loadConvertTools, 'QrCodeTool')
@@ -329,6 +331,29 @@ export const TOOLS: ToolMeta[] = [
     keywords: ['大小写', '命名', 'camelcase', 'snake', '去重', '排序', '统计', 'case', 'naming'],
     icon: 'Aa',
     component: TextTransformTool,
+    priority: 'P1',
+  },
+  {
+    id: 'chinese-convert',
+    name: '繁简转换',
+    category: 'text',
+    keywords: [
+      '繁简',
+      '简繁',
+      '简体',
+      '繁体',
+      '转换',
+      'opencc',
+      'chinese',
+      'traditional',
+      'simplified',
+      '台湾',
+      '香港',
+      's2t',
+      't2s',
+    ],
+    icon: '簡',
+    component: ChineseConvertTool,
     priority: 'P1',
   },
   // ---------- 转换工具 ----------
