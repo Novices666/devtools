@@ -693,7 +693,7 @@ dependencies = [
 
 [[package]]
 name = "devtoolbox"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "tauri",
  "tauri-build",
