@@ -22,6 +22,7 @@ import {
   type Radix,
 } from '../core/convert'
 import { inferImageMime } from '../core/files'
+import { decodeQrCode } from '../core/qrcode'
 import { GeneratedFileButton } from '../components/GeneratedFileButton'
 import { useLatestOperation } from '../hooks/useLatestOperation'
 import { useOpenedBinaryFile } from '../components/OpenFileInputProvider'
@@ -209,12 +210,10 @@ export function QrCodeTool() {
           const ctx = canvas.getContext('2d')
           if (!ctx) throw new Error('无法读取图片像素')
           ctx.drawImage(img, 0, 0)
-          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-          const jsQR = (await import('jsqr')).default
+          const result = await decodeQrCode(canvas)
           if (!isLatest()) return
-          const result = jsQR(imgData.data, imgData.width, imgData.height)
           if (result) {
-            setDecoded(result.data)
+            setDecoded(result)
             setDecodeError(undefined)
           } else {
             setDecodeError('未能识别二维码')
