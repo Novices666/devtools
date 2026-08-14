@@ -1,7 +1,7 @@
 {
   "name": "devtoolbox",
   "private": true,
-  "version": "1.2.1",
+  "version": "1.2.2",
   "type": "module",
   "description": "开发者工具箱 - 聚合式离线开发者工具集（Web + Windows 桌面端）",
   "scripts": {

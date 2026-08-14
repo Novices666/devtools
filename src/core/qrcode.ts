@@ -1,3 +1,5 @@
+import zbarWasmUrl from '@undecaf/zbar-wasm/dist/zbar.wasm?url'
+
 function tryJsQr(
   jsQr: (data: Uint8ClampedArray, width: number, height: number, options?: { inversionAttempts?: 'dontInvert' | 'onlyInvert' | 'attemptBoth' | 'invertFirst' }) => { data: string } | null,
   canvas: HTMLCanvasElement,
@@ -14,7 +16,15 @@ async function tryZBar(canvas: HTMLCanvasElement): Promise<string | undefined> {
   if (!context) return undefined
 
   const image = context.getImageData(0, 0, canvas.width, canvas.height)
-  const { scanImageData, ZBarSymbolType } = await import('@undecaf/zbar-wasm')
+  const { scanImageData, setModuleArgs, ZBarSymbolType } = await import('@undecaf/zbar-wasm')
+  // Vite fingerprints the WASM asset in production; override ZBar's default
+  // relative lookup so desktop and web builds request the emitted URL.
+  const runtime = globalThis as typeof globalThis & {
+    process?: { versions?: { node?: string } }
+  }
+  if (!runtime.process?.versions?.node) {
+    setModuleArgs({ locateFile: () => zbarWasmUrl })
+  }
   const result = (await scanImageData(image)).find((symbol) => symbol.type === ZBarSymbolType.ZBAR_QRCODE)
   return result?.decode()
 }
