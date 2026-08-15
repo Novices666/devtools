@@ -10,6 +10,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // Register explicitly from the web entry point so the Tauri desktop
+      // container never installs a Service Worker for its embedded assets.
+      injectRegister: false,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
@@ -31,6 +34,9 @@ export default defineConfig({
     }),
   ],
   resolve: {
+    // Keep ZBar's WASM inside the browser module so Tauri does not depend on
+    // an external asset URL or WebView custom-protocol path.
+    conditions: ['browser', 'zbar-inlined'],
     alias: {
       '@': path.resolve(__dirname, './src'),
     },

@@ -15,6 +15,14 @@ describe('desktop configuration', () => {
     expect(rust.match(/TrayIconBuilder::with_id\("main"\)/g) ?? []).toHaveLength(1)
   })
 
+  it('uses an isolated desktop WebView data directory for the current release', () => {
+    const config = JSON.parse(readProjectFile('src-tauri/tauri.conf.json')) as {
+      app: { windows: Array<{ dataDirectory?: string }> }
+    }
+
+    expect(config.app.windows[0]?.dataDirectory).toBe('webview-1.2.2')
+  })
+
   it('keeps file associations retired and limits file access to explicit saves', () => {
     const config = JSON.parse(readProjectFile('src-tauri/tauri.conf.json')) as {
       bundle: Record<string, unknown>
@@ -35,5 +43,6 @@ describe('desktop configuration', () => {
     const rust = readProjectFile('src-tauri/src/lib.rs')
     expect(rust).toContain('.plugin(tauri_plugin_dialog::init())')
     expect(rust).toContain('.plugin(tauri_plugin_fs::init())')
+    expect(rust).toContain('.data_directory(data_directory)')
   })
 })

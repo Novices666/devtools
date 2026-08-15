@@ -2,6 +2,7 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    webview::WebviewWindowBuilder,
     Manager,
 };
 
@@ -34,6 +35,26 @@ fn configure_desktop(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<taur
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
+            // Keep desktop WebView data isolated from older releases so stale
+            // Service Workers cannot intercept the current bundled assets.
+            let window_config = app
+                .config()
+                .app
+                .windows
+                .iter()
+                .find(|window| window.label == "main")
+                .cloned()
+                .ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "main window config is missing",
+                    )
+                })?;
+            let data_directory = app.path().app_local_data_dir()?.join("webview-1.2.2");
+            WebviewWindowBuilder::from_config(app.handle(), &window_config)?
+                .data_directory(data_directory)
+                .build()?;
+
             // 系统托盘 + 右键菜单
             let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
