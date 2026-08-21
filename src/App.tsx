@@ -134,6 +134,11 @@ export function App() {
       if (!file) return
       const isLatest = beginWindowFileRead()
       setOpenFileError(undefined)
+      // Base 工具的窗口拖放按文件原始字节编码，文本文件也不走文本内容路由。
+      if (activeId === 'base64') {
+        if (isLatest()) openBinaryFile(file, 'base64')
+        return
+      }
       // 图片：路由到可处理图片的工具
       if (isImageFile(file)) {
         if (isLatest()) openBinaryFile(file)
@@ -144,9 +149,9 @@ export function App() {
         if (isLatest()) openTextFile(file.name, content)
       } catch {
         if (!isLatest()) return
-        // 非文本二进制：在哈希工具则按原始字节处理，否则给出友好提示
-        if (activeId === 'hash') {
-          openBinaryFile(file, 'hash')
+        // 非文本二进制：在哈希或 Base 工具按原始字节处理，否则给出友好提示
+        if (activeId === 'hash' || activeId === 'base64') {
+          openBinaryFile(file, activeId)
         } else {
           setOpenFileError(NON_TEXT_FILE_HINT)
         }

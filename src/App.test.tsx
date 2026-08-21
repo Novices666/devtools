@@ -121,4 +121,23 @@ describe('application file drop', () => {
 
     await findByText(new RegExp(NON_TEXT_FILE_HINT.slice(0, 12)))
   })
+
+  it('routes window-dropped files to Base 工具原始字节编码', async () => {
+    localStorage.setItem('devtoolbox:current', JSON.stringify('base64'))
+    const { container, findByRole, getByText, getAllByRole } = render(<App />)
+    await findByRole('heading', { name: 'Base 编解码' })
+    const bytes = new TextEncoder().encode('abc')
+    const file = new File([bytes], 'payload.bin', { type: 'application/octet-stream' })
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(bytes.buffer),
+    })
+
+    fireEvent.drop(container.firstElementChild!, {
+      dataTransfer: { types: ['Files'], files: [file], dropEffect: 'none' },
+    })
+
+    await waitFor(() => expect(getByText('文件：payload.bin')).toBeTruthy())
+    const output = getAllByRole('textbox').find((element) => element instanceof HTMLTextAreaElement)
+    expect((output as HTMLTextAreaElement).value).toBe('YWJj')
+  })
 })

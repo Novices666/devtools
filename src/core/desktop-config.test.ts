@@ -20,7 +20,7 @@ describe('desktop configuration', () => {
       app: { windows: Array<{ dataDirectory?: string }> }
     }
 
-    expect(config.app.windows[0]?.dataDirectory).toBe('webview-1.2.2')
+    expect(config.app.windows[0]?.dataDirectory).toBe('webview-1.2.3')
   })
 
   it('keeps file associations retired and limits file access to explicit saves', () => {

@@ -72,8 +72,9 @@ export function Base64Tool() {
   const [base, setBase] = useState<BaseEncoding>('base64')
   const [characterEncoding, setCharacterEncoding] = useState<CharacterEncoding>('utf-8')
   const [imgData, setImgData] = useState('')
-  const [imageError, setImageError] = useState<string>()
-  const { begin: beginImageRead, cancel: cancelImageRead } = useLatestOperation()
+  const [fileBase64, setFileBase64] = useState<{ name: string; value: string } | null>(null)
+  const [fileError, setFileError] = useState<string>()
+  const { begin: beginFileRead, cancel: cancelFileRead } = useLatestOperation()
   const { committed, commit, manual, dirty } = useProcessMode(input)
   const { out, error } = useMemo(() => {
     if (committed === '') return { out: '' }
@@ -100,8 +101,12 @@ export function Base64Tool() {
     : 'png'
 
   async function onImageFile(file: File) {
-    const isLatest = beginImageRead()
-    setImageError(undefined)
+    const isLatest = beginFileRead()
+    setFileError(undefined)
+    setFileBase64(null)
+    setImgData('')
+    setInput('')
+    commit('')
     try {
       const bytes = new Uint8Array(await file.arrayBuffer())
       if (!isLatest()) return
@@ -113,13 +118,40 @@ export function Base64Tool() {
     } catch (reason) {
       if (!isLatest()) return
       setImgData('')
-      setImageError(`图片读取失败: ${(reason as Error).message}`)
+      setFileError(`图片读取失败: ${(reason as Error).message}`)
+    }
+  }
+
+  async function onFile(file: File) {
+    const isLatest = beginFileRead()
+    setFileError(undefined)
+    setFileBase64(null)
+    setImgData('')
+    setInput('')
+    commit('')
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      if (!isLatest()) return
+      setFileBase64({ name: file.name, value: bytesToBase64(bytes) })
+      setBase('base64')
+      setMode('encode')
+    } catch (reason) {
+      if (isLatest()) setFileError(`文件读取失败: ${(reason as Error).message}`)
     }
   }
 
   useOpenedBinaryFile(true, (file) => {
-    void onImageFile(file)
+    if (inferImageMime(file)) void onImageFile(file)
+    else void onFile(file)
   })
+
+  const handleTextInput = (text: string) => {
+    cancelFileRead()
+    setInput(text)
+    setFileBase64(null)
+    setImgData('')
+    setFileError(undefined)
+  }
 
   return (
     <ToolShell title="Base 编解码" description="常用 Base 制式互转，可指定文本字符编码">
@@ -137,10 +169,11 @@ export function Base64Tool() {
           <Select
             value={base}
             onChange={(value) => {
-              cancelImageRead()
+              cancelFileRead()
               setBase(value)
+              setFileBase64(null)
               setImgData('')
-              setImageError(undefined)
+              setFileError(undefined)
             }}
             options={BASE_ENCODING_OPTIONS}
           />
@@ -159,8 +192,8 @@ export function Base64Tool() {
             accept="image/*"
             onFile={onImageFile}
             onReject={() => {
-              cancelImageRead()
-              setImageError('请选择图片文件')
+              cancelFileRead()
+              setFileError('请选择图片文件')
             }}
             title="点击或拖入图片"
             className="cursor-pointer rounded-md bg-slate-200/70 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-300/70 dark:bg-slate-700/60 dark:text-slate-200 dark:hover:bg-slate-600/60"
@@ -168,12 +201,26 @@ export function Base64Tool() {
             图片转 Base64
           </FileDropInput>
         )}
-        <Button className="ml-auto" variant="danger" onClick={() => { cancelImageRead(); setInput(''); commit(''); setImgData(''); setImageError(undefined) }}>
+        {base === 'base64' && (
+          <FileDropInput
+            onFile={onFile}
+            title="点击选择文件，或拖入文件按原始字节编码"
+            className="cursor-pointer rounded-md bg-slate-200/70 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-300/70 dark:bg-slate-700/60 dark:text-slate-200 dark:hover:bg-slate-600/60"
+          >
+            文件转 Base64
+          </FileDropInput>
+        )}
+        <Button className="ml-auto" variant="danger" onClick={() => { cancelFileRead(); setInput(''); commit(''); setImgData(''); setFileBase64(null); setFileError(undefined) }}>
           清空
         </Button>
       </div>
-      <ErrorHint message={imageError} />
-      {imgData ? (
+      <ErrorHint message={fileError} />
+      {fileBase64 ? (
+        <Panel title="文件 Base64" actions={<CopyButton text={fileBase64.value} />} className="min-h-0 flex-1">
+          <div className="mb-2 text-xs text-slate-500 dark:text-slate-400">文件：{fileBase64.name}</div>
+          <Output value={fileBase64.value} />
+        </Panel>
+      ) : imgData ? (
         <TwoPane
           left={
             <Panel title="图片 Data URI" actions={<CopyButton text={imgData} />}>
@@ -192,7 +239,7 @@ export function Base64Tool() {
         <TwoPane
           left={
             <Panel title={mode === 'encode' ? `文本输入 (${characterLabel})` : `${baseLabel} 输入`}>
-              <TextArea value={input} onChange={(e) => setInput(e.target.value)} onFileText={(t) => { setInput(t); commit(t) }} placeholder={mode === 'encode' ? '输入待编码文本' : `输入 ${baseLabel}`} />
+              <TextArea value={input} onChange={(e) => handleTextInput(e.target.value)} onFileText={(t) => { handleTextInput(t); commit(t) }} placeholder={mode === 'encode' ? '输入待编码文本' : `输入 ${baseLabel}`} />
               <ErrorHint message={decodedImage ? undefined : error} />
             </Panel>
           }
@@ -206,7 +253,7 @@ export function Base64Tool() {
                     fileName={`decoded.${imgExt}`}
                     filterName="图片"
                     extensions={[imgExt]}
-                    onError={setImageError}
+                    onError={setFileError}
                   >
                     下载图片
                   </GeneratedFileButton>

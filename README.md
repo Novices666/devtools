@@ -116,7 +116,7 @@ npm run tauri:dev
 | Unicode 转义 | 中文与 `\uXXXX`、常用字符串转义序列互转 |
 | JWT 解析 | 解析 Header、Payload、Signature，检查时间声明并校验 HS、RS、PS、ES 签名 |
 
-Base 工具还支持图片与 Base64 Data URI 双向处理、图片预览和下载。
+Base 工具还支持任意文件按原始字节编码为 Base64；图片支持 Base64 Data URI 双向处理、预览和下载。
 
 ### 加密哈希
 

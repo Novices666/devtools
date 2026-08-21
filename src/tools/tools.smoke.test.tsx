@@ -279,6 +279,22 @@ describe('工具组件冒烟测试', () => {
     expect((getAllByRole('textbox')[0] as HTMLTextAreaElement).value).toBe(latestValue)
   })
 
+  it('Base 工具按原始字节编码任意文件', async () => {
+    const BaseTool = TOOLS.find((tool) => tool.id === 'base64')!.component
+    const { getByText, getByRole } = await renderTool(BaseTool)
+    const file = new File(['abc'], 'sample.bin', { type: 'application/octet-stream' })
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(new TextEncoder().encode('abc').buffer),
+    })
+
+    fireEvent.drop(getByText('文件转 Base64').closest('label')!, {
+      dataTransfer: { types: ['Files'], files: [file], dropEffect: 'none' },
+    })
+
+    await waitFor(() => expect(getByText('文件：sample.bin')).toBeTruthy())
+    expect((getByRole('textbox') as HTMLTextAreaElement).value).toBe('YWJj')
+  })
+
   it('URL 参数解析结果可复制为 JSON', async () => {
     const UrlTool = TOOLS.find((t) => t.id === 'url')!.component
     const { getByRole } = await renderTool(UrlTool)

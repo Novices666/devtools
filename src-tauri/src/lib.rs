@@ -50,7 +50,7 @@ fn configure_desktop(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<taur
                         "main window config is missing",
                     )
                 })?;
-            let data_directory = app.path().app_local_data_dir()?.join("webview-1.2.2");
+            let data_directory = app.path().app_local_data_dir()?.join("webview-1.2.3");
             WebviewWindowBuilder::from_config(app.handle(), &window_config)?
                 .data_directory(data_directory)
                 .build()?;
